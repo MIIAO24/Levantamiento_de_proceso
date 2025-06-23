@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -211,14 +210,6 @@ const FormsList = () => {
                   <option value="month">Último mes</option>
                   <option value="year">Último año</option>
                 </select>
-                
-                <Button 
-                  onClick={() => navigate('/')}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Formulario
-                </Button>
               </div>
             </div>
           </CardContent>
