@@ -12,6 +12,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
+import { submitProcessForm, type ProcessFormData, type ApiResponse } from '@/lib/apiService';
 
 const formSchema = z.object({
   nombreSolicitante: z.string().min(1, 'Este campo es requerido'),
