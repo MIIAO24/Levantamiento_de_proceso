@@ -378,3 +378,7 @@ export const testApiConfig = () => {
   console.log(apiService.getPublicConfig());
   return apiService.testConnection();
 };
+
+// Force rebuild - clear cache
+// Timestamp: 2025-06-24-16:45
+export const FORCE_REBUILD = true;
