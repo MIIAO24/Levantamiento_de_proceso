@@ -4,7 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, TrendingUp, FileText, Clock, Plus, Eye, AlertCircle, Loader2 } from 'lucide-react';
-import apiService, { ProcessStats, ProcessForm } from '@/services/apiService';
+import { apiService, ProcessFormData as ProcessForm } from '@/services/apiService';
+interface ProcessStats {
+  total: number;
+  enRevision: number;
+  completados: number;
+  pendientes: number;
+}
 
 const Dashboard = () => {
   const navigate = useNavigate();
