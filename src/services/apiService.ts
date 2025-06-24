@@ -1,6 +1,5 @@
 // src/services/apiService.ts
 const API_BASE_URL = 'https://07mzej7fq9.execute-api.us-east-1.amazonaws.com/dev1';
-
 export interface ProcessForm {
   id: string;
   nombreProceso: string;
