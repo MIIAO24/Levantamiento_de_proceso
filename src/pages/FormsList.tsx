@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, Plus, Eye, Edit, Trash2, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import apiService, { ProcessForm } from '@/services/apiService';
+import { apiService, ProcessFormData as ProcessForm } from '@/services/apiService';
 
 const FormsList = () => {
   const navigate = useNavigate();
