@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -64,6 +63,7 @@ const ProcessForm = () => {
   const [showOtherMotivo, setShowOtherMotivo] = useState(false);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectedMotivos, setSelectedMotivos] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -115,13 +115,47 @@ const ProcessForm = () => {
     }
   };
 
-  const onSubmit = (data: FormData) => {
-    console.log('Form data:', data);
-    console.log('Problems:', problems);
-    toast({
-      title: "Formulario enviado exitosamente",
-      description: "Los datos han sido registrados correctamente.",
-    });
+  const onSubmit = async (data: FormData) => {
+    setIsSubmitting(true);
+    
+    try {
+      // Validar que los problemas tengan contenido antes de enviar
+      const validProblems = problems.filter(p => p.problema.trim() !== '' || p.impacto.trim() !== '');
+      
+      console.log('Enviando datos:', { formData: data, problems: validProblems });
+      
+      const response = await submitProcessForm(data, validProblems);
+      
+      if (response.success) {
+        toast({
+          title: "✅ Formulario enviado exitosamente",
+          description: "Los datos han sido registrados correctamente en el sistema.",
+          variant: "default",
+        });
+        
+        // Opcional: resetear el formulario después del envío exitoso
+        form.reset();
+        setProblems([{ id: 1, problema: '', impacto: '' }]);
+        setSelectedTools([]);
+        setSelectedMotivos([]);
+        setShowOtherTools(false);
+        setShowOtherMotivo(false);
+        
+      } else {
+        throw new Error(response.error || 'Error desconocido');
+      }
+      
+    } catch (error) {
+      console.error('Error al enviar formulario:', error);
+      
+      toast({
+        title: "❌ Error al enviar formulario",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado. Por favor, intente nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
@@ -152,7 +186,7 @@ const ProcessForm = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="nombreSolicitante">Nombre del solicitante <span className="text-red-500">*</span></Label>
-                  <Input {...form.register('nombreSolicitante')} className="mt-1" />
+                  <Input {...form.register('nombreSolicitante')} className="mt-1" disabled={isSubmitting} />
                   {form.formState.errors.nombreSolicitante && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.nombreSolicitante.message}</p>
                   )}
@@ -160,7 +194,7 @@ const ProcessForm = () => {
                 
                 <div>
                   <Label htmlFor="areaDepartamento">Área/Departamento <span className="text-red-500">*</span></Label>
-                  <Input {...form.register('areaDepartamento')} className="mt-1" />
+                  <Input {...form.register('areaDepartamento')} className="mt-1" disabled={isSubmitting} />
                   {form.formState.errors.areaDepartamento && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.areaDepartamento.message}</p>
                   )}
@@ -168,7 +202,7 @@ const ProcessForm = () => {
                 
                 <div>
                   <Label htmlFor="fechaSolicitud">Fecha de solicitud <span className="text-red-500">*</span></Label>
-                  <Input type="date" {...form.register('fechaSolicitud')} className="mt-1" />
+                  <Input type="date" {...form.register('fechaSolicitud')} className="mt-1" disabled={isSubmitting} />
                   {form.formState.errors.fechaSolicitud && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.fechaSolicitud.message}</p>
                   )}
@@ -176,7 +210,7 @@ const ProcessForm = () => {
                 
                 <div>
                   <Label htmlFor="nombreProceso">Nombre del proceso <span className="text-red-500">*</span></Label>
-                  <Input {...form.register('nombreProceso')} className="mt-1" />
+                  <Input {...form.register('nombreProceso')} className="mt-1" disabled={isSubmitting} />
                   {form.formState.errors.nombreProceso && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.nombreProceso.message}</p>
                   )}
@@ -195,6 +229,7 @@ const ProcessForm = () => {
                     {...form.register('descripcionGeneral')} 
                     placeholder="Describe qué hace el proceso, cuál es su propósito y qué resultados produce" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.descripcionGeneral && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.descripcionGeneral.message}</p>
@@ -207,6 +242,7 @@ const ProcessForm = () => {
                     {...form.register('objetivoProceso')} 
                     placeholder="¿Cuál es el objetivo principal que persigue el proceso?" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.objetivoProceso && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.objetivoProceso.message}</p>
@@ -220,6 +256,7 @@ const ProcessForm = () => {
                     placeholder="Describe los pasos principales actuales" 
                     rows={4} 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.pasosPrincipales && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.pasosPrincipales.message}</p>
@@ -242,6 +279,7 @@ const ProcessForm = () => {
                           id={tool.id}
                           checked={selectedTools.includes(tool.id)}
                           onCheckedChange={(checked) => handleToolChange(tool.id, checked as boolean)}
+                          disabled={isSubmitting}
                         />
                         <Label htmlFor={tool.id} className="cursor-pointer">{tool.label}</Label>
                       </div>
@@ -250,7 +288,7 @@ const ProcessForm = () => {
                   {showOtherTools && (
                     <div className="mt-3">
                       <Label htmlFor="otrasHerramientas">Especifique otras herramientas:</Label>
-                      <Input {...form.register('otrasHerramientas')} className="mt-1" />
+                      <Input {...form.register('otrasHerramientas')} className="mt-1" disabled={isSubmitting} />
                     </div>
                   )}
                   {form.formState.errors.herramientas && (
@@ -267,7 +305,7 @@ const ProcessForm = () => {
               <div className="space-y-6">
                 <div>
                   <Label htmlFor="responsableProceso">Responsable del proceso <span className="text-red-500">*</span></Label>
-                  <Input {...form.register('responsableProceso')} className="mt-1" />
+                  <Input {...form.register('responsableProceso')} className="mt-1" disabled={isSubmitting} />
                   {form.formState.errors.responsableProceso && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.responsableProceso.message}</p>
                   )}
@@ -279,6 +317,7 @@ const ProcessForm = () => {
                     {...form.register('participantesPrincipales')} 
                     placeholder="Lista de personas, roles o áreas que participan en el proceso" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.participantesPrincipales && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.participantesPrincipales.message}</p>
@@ -291,6 +330,7 @@ const ProcessForm = () => {
                     {...form.register('clientesBeneficiarios')} 
                     placeholder="¿Quiénes reciben el resultado de este proceso? (internos/externos)" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.clientesBeneficiarios && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.clientesBeneficiarios.message}</p>
@@ -310,6 +350,7 @@ const ProcessForm = () => {
                     {...form.register('reglasNegocio')} 
                     placeholder="¿Qué reglas o lógica específica gobierna este proceso? (validaciones, condiciones, criterios de decisión)" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.reglasNegocio && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.reglasNegocio.message}</p>
@@ -323,6 +364,7 @@ const ProcessForm = () => {
                       {...form.register('casosExcepcionales')} 
                       placeholder="¿Qué situaciones específicas o excepcionales puede presentar el proceso?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -332,6 +374,7 @@ const ProcessForm = () => {
                       {...form.register('procedimientosEscalamiento')} 
                       placeholder="¿Qué se hace cuando ocurren problemas o excepciones?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -341,6 +384,7 @@ const ProcessForm = () => {
                       {...form.register('normativasRegulatorias')} 
                       placeholder="¿Qué leyes, normas o regulaciones debe cumplir el proceso?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -350,6 +394,7 @@ const ProcessForm = () => {
                       {...form.register('politicasInternas')} 
                       placeholder="¿Qué políticas de la organización aplican a este proceso?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -359,6 +404,7 @@ const ProcessForm = () => {
                       {...form.register('requisitosSeguridad')} 
                       placeholder="¿Qué consideraciones de seguridad o privacidad debe cumplir?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -368,6 +414,7 @@ const ProcessForm = () => {
                       {...form.register('auditoriasControles')} 
                       placeholder="¿Requiere auditoría o controles específicos?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -385,6 +432,7 @@ const ProcessForm = () => {
                     {...form.register('kpiMetricas')} 
                     placeholder="¿Qué métricas se utilizan actualmente para medir el desempeño del proceso?" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                 </div>
                 
@@ -394,6 +442,7 @@ const ProcessForm = () => {
                     {...form.register('objetivosCuantificables')} 
                     placeholder="¿Qué metas específicas busca alcanzar con la mejora? (ej: reducir tiempo en 50%, eliminar 3 pasos manuales)" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -411,6 +460,7 @@ const ProcessForm = () => {
                         type="button"
                         onClick={() => removeProblem(problem.id)}
                         className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600 transition-colors"
+                        disabled={isSubmitting}
                       >
                         Eliminar
                       </button>
@@ -428,6 +478,7 @@ const ProcessForm = () => {
                             setProblems(newProblems);
                           }}
                           className="mt-1"
+                          disabled={isSubmitting}
                         />
                       </div>
                       
@@ -442,6 +493,7 @@ const ProcessForm = () => {
                             setProblems(newProblems);
                           }}
                           className="mt-1"
+                          disabled={isSubmitting}
                         />
                       </div>
                     </div>
@@ -452,6 +504,7 @@ const ProcessForm = () => {
                   type="button"
                   onClick={addProblem}
                   className="bg-green-500 hover:bg-green-600 text-white"
+                  disabled={isSubmitting}
                 >
                   + Añadir otro problema
                 </Button>
@@ -469,6 +522,7 @@ const ProcessForm = () => {
                     {...form.register('funcionalidadesRequeridas')} 
                     placeholder="¿Qué funcionalidades específicas debe tener la solución tecnológica? (ej: gestión de usuarios, reportes automatizados, notificaciones, flujos de aprobación)" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.funcionalidadesRequeridas && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.funcionalidadesRequeridas.message}</p>
@@ -480,17 +534,18 @@ const ProcessForm = () => {
                   <RadioGroup 
                     onValueChange={(value) => form.setValue('tipoInterfaz', value)}
                     className="flex flex-wrap gap-4 mt-2"
+                    disabled={isSubmitting}
                   >
                     <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <RadioGroupItem value="appWeb" id="appWebOption" />
+                      <RadioGroupItem value="appWeb" id="appWebOption" disabled={isSubmitting} />
                       <Label htmlFor="appWebOption">Aplicación web</Label>
                     </div>
                     <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <RadioGroupItem value="appMovil" id="appMovil" />
+                      <RadioGroupItem value="appMovil" id="appMovil" disabled={isSubmitting} />
                       <Label htmlFor="appMovil">Aplicación móvil</Label>
                     </div>
                     <div className="flex items-center space-x-2 p-3 bg-gray-50 rounded-lg">
-                      <RadioGroupItem value="hibrido" id="hibrido" />
+                      <RadioGroupItem value="hibrido" id="hibrido" disabled={isSubmitting} />
                       <Label htmlFor="hibrido">Híbrido (web + móvil)</Label>
                     </div>
                   </RadioGroup>
@@ -506,6 +561,7 @@ const ProcessForm = () => {
                       {...form.register('integracionesRequeridas')} 
                       placeholder="¿Con qué sistemas debe integrarse la nueva aplicación?" 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                   
@@ -515,6 +571,7 @@ const ProcessForm = () => {
                       {...form.register('requisitosNoFuncionales')} 
                       placeholder="Performance, escalabilidad, usabilidad, disponibilidad, etc." 
                       className="mt-1"
+                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
@@ -537,6 +594,7 @@ const ProcessForm = () => {
                           id={motivo.id}
                           checked={selectedMotivos.includes(motivo.id)}
                           onCheckedChange={(checked) => handleMotivoChange(motivo.id, checked as boolean)}
+                          disabled={isSubmitting}
                         />
                         <Label htmlFor={motivo.id} className="cursor-pointer">{motivo.label}</Label>
                       </div>
@@ -545,7 +603,7 @@ const ProcessForm = () => {
                   {showOtherMotivo && (
                     <div className="mt-3">
                       <Label htmlFor="otroMotivoTexto">Especifique otro motivo:</Label>
-                      <Input {...form.register('otroMotivoTexto')} className="mt-1" />
+                      <Input {...form.register('otroMotivoTexto')} className="mt-1" disabled={isSubmitting} />
                     </div>
                   )}
                   {form.formState.errors.motivoLevantamiento && (
@@ -559,6 +617,7 @@ const ProcessForm = () => {
                     {...form.register('resultadosEsperados')} 
                     placeholder="¿Qué espera lograr con la mejora del proceso?" 
                     className="mt-1"
+                    disabled={isSubmitting}
                   />
                   {form.formState.errors.resultadosEsperados && (
                     <p className="text-red-500 text-sm mt-1">{form.formState.errors.resultadosEsperados.message}</p>
@@ -584,6 +643,7 @@ const ProcessForm = () => {
                         {...form.register('sistemasApoyo')} 
                         placeholder="Lista de los sistemas/aplicaciones que actualmente soportan este proceso" 
                         className="mt-1"
+                        disabled={isSubmitting}
                       />
                     </div>
                     
@@ -593,6 +653,7 @@ const ProcessForm = () => {
                         {...form.register('baseDatosInvolucrados')} 
                         placeholder="¿Qué base de datos o repositorios de información utiliza el proceso?" 
                         className="mt-1"
+                        disabled={isSubmitting}
                       />
                     </div>
                     
@@ -602,6 +663,7 @@ const ProcessForm = () => {
                         {...form.register('integracionesExistentes')} 
                         placeholder="¿Existen conexiones/integraciones entre sistemas para este proceso?" 
                         className="mt-1"
+                        disabled={isSubmitting}
                       />
                     </div>
                   </div>
@@ -619,6 +681,7 @@ const ProcessForm = () => {
                         {...form.register('origenInformacion')} 
                         placeholder="¿De dónde provienen los datos que alimentan este proceso?" 
                         className="mt-1"
+                        disabled={isSubmitting}
                       />
                     </div>
                     
@@ -628,6 +691,7 @@ const ProcessForm = () => {
                         {...form.register('destinoInformacion')} 
                         placeholder="¿A dónde va la información procesada?" 
                         className="mt-1"
+                        disabled={isSubmitting}
                       />
                     </div>
                   </div>
@@ -635,13 +699,28 @@ const ProcessForm = () => {
               </div>
             </div>
 
+            {/* Botón de envío */}
             <div className="p-8 text-center">
               <Button 
                 type="submit" 
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-12 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-12 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 relative"
+                disabled={isSubmitting}
               >
-                Enviar Formulario
+                {isSubmitting ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar Formulario'
+                )}
               </Button>
+              
+              {isSubmitting && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Por favor espere mientras se procesa su solicitud...
+                </p>
+              )}
             </div>
           </form>
         </CardContent>
