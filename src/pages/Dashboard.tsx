@@ -1,69 +1,94 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
-import { BarChart, TrendingUp, FileText, Clock, Plus, Eye } from 'lucide-react';
+import { BarChart, TrendingUp, FileText, Clock, Plus, Eye, AlertCircle, Loader2 } from 'lucide-react';
+import apiService, { ProcessStats, ProcessForm } from '@/services/apiService';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState<ProcessStats>({
+    total: 0,
+    completados: 0,
+    enRevision: 0,
+    pendientes: 0,
+    porArea: {},
+    recientes: []
+  });
+  const [recentProcesses, setRecentProcesses] = useState<ProcessForm[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Datos de ejemplo para las estadísticas
-  const stats = {
-    total: 24,
-    revision: 8,
-    completados: 12,
-    pendientes: 4
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Cargar estadísticas y procesos recientes en paralelo
+      const [statsResponse, formsResponse] = await Promise.all([
+        apiService.getStats(),
+        apiService.getForms({ limit: 5 })
+      ]);
+
+      if (statsResponse.success) {
+        setStats(statsResponse.data);
+      }
+
+      if (formsResponse.success) {
+        setRecentProcesses(formsResponse.data.items.slice(0, 3));
+      }
+
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+      setError('Error al cargar los datos del dashboard');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Últimos procesos
-  const recentProcesses = [
-    {
-      id: '005',
-      nombreProceso: 'Control de Calidad',
-      solicitante: 'Patricia Silva',
-      areaDepartamento: 'Calidad',
-      fechaSolicitud: '2024-03-25',
-      estado: 'revision'
-    },
-    {
-      id: '004',
-      nombreProceso: 'Aprobación de Compras',
-      solicitante: 'Luis Fernández',
-      areaDepartamento: 'Compras',
-      fechaSolicitud: '2024-03-22',
-      estado: 'completado'
-    },
-    {
-      id: '003',
-      nombreProceso: 'Onboarding de Empleados',
-      solicitante: 'Ana Martínez',
-      areaDepartamento: 'Recursos Humanos',
-      fechaSolicitud: '2024-03-20',
-      estado: 'pendiente'
-    }
-  ];
-
   const getStatusBadge = (estado: string) => {
-    const variants = {
-      completado: 'default',
-      revision: 'secondary',
-      pendiente: 'destructive'
+    const variants: Record<string, any> = {
+      'Completado': 'default',
+      'En Revisión': 'secondary',
+      'Pendiente': 'destructive'
     };
     
-    const labels = {
-      completado: 'Completado',
-      revision: 'En Revisión',
-      pendiente: 'Pendiente'
-    };
-
     return (
-      <Badge variant={variants[estado as keyof typeof variants] as any}>
-        {labels[estado as keyof typeof labels]}
+      <Badge variant={variants[estado] || 'outline'}>
+        {estado}
       </Badge>
     );
   };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Error al cargar datos</h3>
+            <p className="text-gray-600 mb-4">{error}</p>
+            <Button onClick={loadDashboardData} className="w-full">
+              Reintentar
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -80,7 +105,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-blue-700 mb-2">{stats.total}</div>
+                  <div className="text-3xl font-bold text-blue-700 mb-2">
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.total}
+                  </div>
                   <div className="text-gray-600">Total de Procesos</div>
                 </div>
                 <FileText className="h-8 w-8 text-blue-700" />
@@ -92,7 +119,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-yellow-600 mb-2">{stats.revision}</div>
+                  <div className="text-3xl font-bold text-yellow-600 mb-2">
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.enRevision}
+                  </div>
                   <div className="text-gray-600">En Revisión</div>
                 </div>
                 <Clock className="h-8 w-8 text-yellow-600" />
@@ -104,7 +133,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-green-600 mb-2">{stats.completados}</div>
+                  <div className="text-3xl font-bold text-green-600 mb-2">
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.completados}
+                  </div>
                   <div className="text-gray-600">Completados</div>
                 </div>
                 <TrendingUp className="h-8 w-8 text-green-600" />
@@ -116,7 +147,9 @@ const Dashboard = () => {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-3xl font-bold text-red-600 mb-2">{stats.pendientes}</div>
+                  <div className="text-3xl font-bold text-red-600 mb-2">
+                    {loading ? <Loader2 className="h-8 w-8 animate-spin" /> : stats.pendientes}
+                  </div>
                   <div className="text-gray-600">Pendientes</div>
                 </div>
                 <BarChart className="h-8 w-8 text-red-600" />
@@ -140,20 +173,36 @@ const Dashboard = () => {
               </Button>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {recentProcesses.map((process) => (
-                  <div key={process.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex-1">
-                      <div className="font-semibold text-blue-700">{process.nombreProceso}</div>
-                      <div className="text-sm text-gray-600">{process.solicitante} - {process.areaDepartamento}</div>
-                      <div className="text-xs text-gray-500">{new Date(process.fechaSolicitud).toLocaleDateString('es-ES')}</div>
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {recentProcesses.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      No hay procesos registrados
                     </div>
-                    <div>
-                      {getStatusBadge(process.estado)}
-                    </div>
-                  </div>
-                ))}
-              </div>
+                  ) : (
+                    recentProcesses.map((process) => (
+                      <div key={process.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <div className="font-semibold text-blue-700">{process.nombreProceso}</div>
+                          <div className="text-sm text-gray-600">
+                            {process.nombreSolicitante} - {process.areaDepartamento}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatDate(process.fechaSolicitud || process.timestamp)}
+                          </div>
+                        </div>
+                        <div>
+                          {getStatusBadge(process.estado)}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -185,18 +234,58 @@ const Dashboard = () => {
                 
                 <div className="grid grid-cols-2 gap-3">
                   <Card className="p-4 text-center hover:bg-gray-50 cursor-pointer">
-                    <div className="text-2xl font-bold text-yellow-600">{stats.revision}</div>
+                    <div className="text-2xl font-bold text-yellow-600">
+                      {loading ? '...' : stats.enRevision}
+                    </div>
                     <div className="text-sm text-gray-600">Pendientes de Revisión</div>
                   </Card>
                   
                   <Card className="p-4 text-center hover:bg-gray-50 cursor-pointer">
-                    <div className="text-2xl font-bold text-green-600">{stats.completados}</div>
+                    <div className="text-2xl font-bold text-green-600">
+                      {loading ? '...' : stats.completados}
+                    </div>
                     <div className="text-sm text-gray-600">Procesos Completados</div>
                   </Card>
                 </div>
+
+                {/* Distribución por Área */}
+                {!loading && Object.keys(stats.porArea).length > 0 && (
+                  <Card className="p-4">
+                    <h4 className="font-semibold text-sm text-gray-700 mb-3">Procesos por Área</h4>
+                    <div className="space-y-2">
+                      {Object.entries(stats.porArea)
+                        .sort(([,a], [,b]) => b - a)
+                        .slice(0, 3)
+                        .map(([area, count]) => (
+                          <div key={area} className="flex justify-between text-sm">
+                            <span className="text-gray-600">{area}</span>
+                            <span className="font-semibold text-blue-600">{count}</span>
+                          </div>
+                        ))}
+                    </div>
+                  </Card>
+                )}
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Botón de actualización */}
+        <div className="mt-6 text-center">
+          <Button 
+            variant="outline" 
+            onClick={loadDashboardData}
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Cargando...
+              </>
+            ) : (
+              'Actualizar Datos'
+            )}
+          </Button>
         </div>
       </div>
     </div>
