@@ -124,7 +124,10 @@ const ProcessForm = () => {
       
       console.log('Enviando datos:', { formData: data, problems: validProblems });
       
-      const response = await submitProcessForm(data, validProblems);
+const response = await submitProcessForm({
+  formData: data,
+  problems: validProblems
+});
       
       if (response.success) {
         toast({
