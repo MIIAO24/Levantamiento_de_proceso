@@ -1,263 +1,150 @@
 // src/lib/apiService.ts
 const API_BASE_URL = 'https://07mzej7fq9.execute-api.us-east-1.amazonaws.com/dev1';
 
-export interface ProcessFormData {
-  // Información general
+export interface ProcessForm {
+  id: string;
+  nombreProceso: string;
   nombreSolicitante: string;
   areaDepartamento: string;
   fechaSolicitud: string;
-  nombreProceso: string;
-  
-  // Descripción del proceso
-  descripcionGeneral: string;
-  objetivoProceso: string;
-  pasosPrincipales: string;
-  herramientas: string[];
-  otrasHerramientas?: string;
-  
-  // Participantes
-  responsableProceso: string;
-  participantesPrincipales: string;
-  clientesBeneficiarios: string;
-  
-  // Reglas de negocio
-  reglasNegocio: string;
-  casosExcepcionales?: string;
-  procedimientosEscalamiento?: string;
-  normativasRegulatorias?: string;
-  politicasInternas?: string;
-  requisitosSeguridad?: string;
-  auditoriasControles?: string;
-  
-  // Métricas
-  kpiMetricas?: string;
-  objetivosCuantificables?: string;
-  
-  // Solución
-  funcionalidadesRequeridas: string;
-  tipoInterfaz: string;
-  integracionesRequeridas?: string;
-  requisitosNoFuncionales?: string;
-  motivoLevantamiento: string[];
-  otroMotivoTexto?: string;
-  resultadosEsperados: string;
-  
-  // Información técnica
-  sistemasApoyo?: string;
-  baseDatosInvolucrados?: string;
-  integracionesExistentes?: string;
-  origenInformacion?: string;
-  destinoInformacion?: string;
-}
-
-export interface Problem {
-  id: number;
-  problema: string;
-  impacto: string;
-}
-
-export interface SubmitProcessData {
-  formData: ProcessFormData;
-  problems: Problem[];
   timestamp: string;
+  createdAt: number;
+  estado: 'Completado' | 'En Revisión' | 'Pendiente';
+  descripcionGeneral?: string;
+  objetivoProceso?: string;
+  pasosPrincipales?: string;
+  responsableProceso?: string;
+  participantesPrincipales?: string;
+  clientesBeneficiarios?: string;
+  reglasNegocio?: string;
+  funcionalidadesRequeridas?: string;
+  tipoInterfaz?: string;
+  motivoLevantamiento?: string[];
+  resultadosEsperados?: string;
+  herramientas?: string[];
+  problems?: any[];
+  [key: string]: any;
 }
 
-export interface ApiResponse {
+export interface ProcessStats {
+  total: number;
+  completados: number;
+  enRevision: number;
+  pendientes: number;
+  porArea: Record<string, number>;
+  recientes: Array<{
+    id: string;
+    nombreProceso: string;
+    nombreSolicitante: string;
+    timestamp: string;
+  }>;
+}
+
+export interface ApiResponse<T> {
   success: boolean;
-  message: string;
-  data?: any;
+  message?: string;
+  data: T;
   error?: string;
-  statusCode?: number;
 }
 
-export const submitProcessForm = async (
-  formData: ProcessFormData, 
-  problems: Problem[]
-): Promise<ApiResponse> => {
-  try {
-    // Agregar timestamp e información adicional
-    const payload: SubmitProcessData = {
-      formData,
-      problems,
-      timestamp: new Date().toISOString()
-    };
-
-    console.log('Enviando datos a API:', {
-      url: `${API_BASE_URL}/Form_proceso`,
-      payload: payload
-    });
-
-    const response = await fetch(`${API_BASE_URL}/Form_proceso`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
-      body: JSON.stringify(payload)
-    });
-
-    console.log('Respuesta de API recibida:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-
-    // Intentar parsear la respuesta
-    let result;
-    const responseText = await response.text();
-    
+class ApiService {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
-      result = JSON.parse(responseText);
-    } catch (parseError) {
-      console.warn('No se pudo parsear respuesta como JSON:', responseText);
-      result = { message: responseText };
-    }
+      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
+        ...options,
+      });
 
-    console.log('Resultado parseado:', result);
-
-    if (!response.ok) {
-      throw new Error(
-        result?.message || 
-        result?.error || 
-        `Error HTTP ${response.status}: ${response.statusText}`
-      );
-    }
-    
-    return {
-      success: true,
-      message: result?.message || 'Formulario enviado exitosamente',
-      data: result,
-      statusCode: response.status
-    };
-
-  } catch (error) {
-    console.error('Error en submitProcessForm:', error);
-    
-    // Manejo específico de errores
-    let errorMessage = 'Error desconocido al enviar el formulario';
-    
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      errorMessage = 'Error de conexión. Verifique su conexión a internet y la configuración de CORS.';
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    
-    return {
-      success: false,
-      message: 'Error al enviar el formulario',
-      error: errorMessage
-    };
-  }
-};
-
-// Función para validar la conexión con la API
-export const testApiConnection = async (): Promise<{
-  success: boolean;
-  message: string;
-  details?: any;
-}> => {
-  try {
-    console.log('Probando conexión con API...');
-    
-    const response = await fetch(`${API_BASE_URL}/Form_proceso`, {
-      method: 'OPTIONS',
-      headers: {
-        'Content-Type': 'application/json',
-      }
-    });
-    
-    console.log('Respuesta de test de conexión:', {
-      status: response.status,
-      statusText: response.statusText,
-      headers: Object.fromEntries(response.headers.entries())
-    });
-    
-    if (response.ok) {
-      return {
-        success: true,
-        message: 'Conexión exitosa con la API',
-        details: {
-          status: response.status,
-          statusText: response.statusText
-        }
-      };
-    } else {
-      return {
-        success: false,
-        message: `Error de conexión: ${response.status} ${response.statusText}`,
-        details: {
-          status: response.status,
-          statusText: response.statusText
-        }
-      };
-    }
-  } catch (error) {
-    console.error('Error al probar conexión con API:', error);
-    
-    return {
-      success: false,
-      message: 'No se pudo conectar con la API',
-      details: error instanceof Error ? error.message : 'Error desconocido'
-    };
-  }
-};
-
-// Función utilitaria para validar datos antes del envío
-export const validateFormData = (data: ProcessFormData, problems: Problem[]): {
-  isValid: boolean;
-  errors: string[];
-} => {
-  const errors: string[] = [];
-  
-  // Validaciones básicas
-  if (!data.nombreSolicitante?.trim()) {
-    errors.push('Nombre del solicitante es requerido');
-  }
-  
-  if (!data.nombreProceso?.trim()) {
-    errors.push('Nombre del proceso es requerido');
-  }
-  
-  if (!data.herramientas || data.herramientas.length === 0) {
-    errors.push('Debe seleccionar al menos una herramienta');
-  }
-  
-  if (!data.motivoLevantamiento || data.motivoLevantamiento.length === 0) {
-    errors.push('Debe seleccionar al menos un motivo de levantamiento');
-  }
-  
-  // Validar que los problemas tengan contenido si se agregaron
-  if (problems.length > 0) {
-    const emptyProblems = problems.filter(p => !p.problema.trim() && !p.impacto.trim());
-    if (emptyProblems.length === problems.length) {
-      // Todos los problemas están vacíos, eso está bien
-    } else {
-      // Hay algunos problemas con contenido, validar que estén completos
-      const incompleteProblems = problems.filter(p => 
-        (p.problema.trim() && !p.impacto.trim()) || 
-        (!p.problema.trim() && p.impacto.trim())
-      );
+      const data = await response.json();
       
-      if (incompleteProblems.length > 0) {
-        errors.push('Los problemas deben tener tanto descripción como impacto');
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
+
+      return data;
+    } catch (error) {
+      console.error(`API request failed: ${endpoint}`, error);
+      throw error;
     }
   }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
+
+  // Obtener todas las formas con filtros opcionales
+  async getForms(params: {
+    search?: string;
+    status?: string;
+    limit?: number;
+    lastKey?: string;
+  } = {}): Promise<ApiResponse<{
+    items: ProcessForm[];
+    total: number;
+    count: number;
+    lastKey?: string;
+  }>> {
+    const queryParams = new URLSearchParams();
+    
+    if (params.search) queryParams.append('search', params.search);
+    if (params.status) queryParams.append('status', params.status);
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.lastKey) queryParams.append('lastKey', params.lastKey);
+
+    const endpoint = `/Form_proceso${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+    return this.request<{
+      items: ProcessForm[];
+      total: number;
+      count: number;
+      lastKey?: string;
+    }>(endpoint);
+  }
+
+  // Obtener una forma específica por ID
+  async getFormById(id: string): Promise<ApiResponse<ProcessForm>> {
+    return this.request<ProcessForm>(`/Form_proceso?id=${id}`);
+  }
+
+  // Obtener estadísticas
+  async getStats(): Promise<ApiResponse<ProcessStats>> {
+    return this.request<ProcessStats>('/stats');
+  }
+
+  // Crear nueva forma
+  async createForm(formData: any): Promise<ApiResponse<{
+    id: string;
+    timestamp: string;
+    processName: string;
+    savedToDatabase: boolean;
+  }>> {
+    return this.request(`/Form_proceso`, {
+      method: 'POST',
+      body: JSON.stringify(formData),
+    });
+  }
+
+  // Eliminar forma (implementar en Lambda si es necesario)
+  async deleteForm(id: string): Promise<ApiResponse<{ message: string }>> {
+    return this.request<{ message: string }>(`/Form_proceso`, {
+      method: 'DELETE',
+      body: JSON.stringify({ id }),
+    });
+  }
+
+  // Probar conexión con la base de datos
+  async testConnection(): Promise<ApiResponse<{
+    success: boolean;
+    tableStatus: string;
+    itemCount: number;
+    message: string;
+    tableName: string;
+  }>> {
+    return this.request('/test-db');
+  }
+}
+
+// Hook personalizado para usar el servicio
+export const useApiService = () => {
+  return new ApiService();
 };
 
-// Función para formatear datos antes del envío (opcional)
-export const formatFormData = (data: ProcessFormData): ProcessFormData => {
-  return {
-    ...data,
-    // Limpiar espacios en blanco
-    nombreSolicitante: data.nombreSolicitante?.trim(),
-    nombreProceso: data.nombreProceso?.trim(),
-    descripcionGeneral: data.descripcionGeneral?.trim(),
-    // Agregar más formateo según sea necesario
-  };
-};
+export default new ApiService();
