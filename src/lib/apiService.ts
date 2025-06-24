@@ -49,8 +49,15 @@ export interface ApiResponse<T> {
 
 class ApiService {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    console.log('🌐 API Request:', { 
+      fullUrl, 
+      method: options.method || 'GET',
+      endpoint 
+    });
+
     try {
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await fetch(fullUrl, {
         headers: {
           'Content-Type': 'application/json',
           ...options.headers,
@@ -58,15 +65,32 @@ class ApiService {
         ...options,
       });
 
+      console.log('📡 API Response:', {
+        url: fullUrl,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      });
+
       const data = await response.json();
       
       if (!response.ok) {
+        console.error('❌ API Error:', {
+          url: fullUrl,
+          status: response.status,
+          data
+        });
         throw new Error(data.message || `HTTP error! status: ${response.status}`);
       }
 
+      console.log('✅ API Success:', {
+        url: fullUrl,
+        dataKeys: Object.keys(data)
+      });
+
       return data;
     } catch (error) {
-      console.error(`API request failed: ${endpoint}`, error);
+      console.error(`❌ API request failed: ${fullUrl}`, error);
       throw error;
     }
   }
@@ -104,9 +128,50 @@ class ApiService {
     return this.request<ProcessForm>(`/Form_proceso?id=${id}`);
   }
 
-  // Obtener estadísticas
+  // Obtener estadísticas (usando endpoint existente)
   async getStats(): Promise<ApiResponse<ProcessStats>> {
-    return this.request<ProcessStats>('/stats');
+    try {
+      // Primero obtenemos todos los formularios
+      const formsResponse = await this.getForms({ limit: 100 });
+      
+      if (!formsResponse.success) {
+        throw new Error(formsResponse.message || 'Error al obtener formularios');
+      }
+
+      const forms = formsResponse.data.items;
+      
+      // Calcular estadísticas localmente
+      const stats: ProcessStats = {
+        total: forms.length,
+        completados: forms.filter(f => f.estado === 'Completado').length,
+        enRevision: forms.filter(f => f.estado === 'En Revisión').length,
+        pendientes: forms.filter(f => f.estado === 'Pendiente').length,
+        porArea: {},
+        recientes: forms
+          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
+          .slice(0, 5)
+          .map(form => ({
+            id: form.id,
+            nombreProceso: form.nombreProceso,
+            nombreSolicitante: form.nombreSolicitante,
+            timestamp: form.timestamp
+          }))
+      };
+
+      // Calcular distribución por área
+      forms.forEach(form => {
+        const area = form.areaDepartamento || 'Sin área';
+        stats.porArea[area] = (stats.porArea[area] || 0) + 1;
+      });
+
+      return {
+        success: true,
+        data: stats
+      };
+    } catch (error) {
+      console.error('Error calculating stats:', error);
+      throw error;
+    }
   }
 
   // Crear nueva forma
