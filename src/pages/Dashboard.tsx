@@ -4,7 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { BarChart, TrendingUp, FileText, Clock, Plus, Eye, AlertCircle, Loader2 } from 'lucide-react';
-import { apiService, ProcessFormData as ProcessForm } from '@/services/apiService';
+import { apiService, getStats, getProcessForms, ProcessFormData as ProcessForm } from '@/services/apiService';
+
 interface ProcessStats {
   total: number;
   enRevision: number;
@@ -18,9 +19,7 @@ const Dashboard = () => {
     total: 0,
     completados: 0,
     enRevision: 0,
-    pendientes: 0,
-    porArea: {},
-    recientes: []
+    pendientes: 0
   });
   const [recentProcesses, setRecentProcesses] = useState<ProcessForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,8 +36,8 @@ const Dashboard = () => {
 
       // Cargar estadísticas y procesos recientes en paralelo
       const [statsResponse, formsResponse] = await Promise.all([
-        apiService.getStats(),
-        apiService.getForms({ limit: 5 })
+        getStats(),
+        getProcessForms()
       ]);
 
       if (statsResponse.success) {
@@ -46,7 +45,8 @@ const Dashboard = () => {
       }
 
       if (formsResponse.success) {
-        setRecentProcesses(formsResponse.data.items.slice(0, 3));
+        const forms = Array.isArray(formsResponse.data) ? formsResponse.data : [];
+        setRecentProcesses(forms.slice(0, 3));
       }
 
     } catch (err) {
@@ -66,12 +66,13 @@ const Dashboard = () => {
     
     return (
       <Badge variant={variants[estado] || 'outline'}>
-        {estado}
+        {estado || 'Sin Estado'}
       </Badge>
     );
   };
 
   const formatDate = (dateString: string) => {
+    if (!dateString) return 'Sin fecha';
     return new Date(dateString).toLocaleDateString('es-ES', {
       day: '2-digit',
       month: '2-digit',
@@ -172,7 +173,7 @@ const Dashboard = () => {
               <Button 
                 variant="outline" 
                 size="sm"
-                onClick={() => navigate('/formularios')}
+                onClick={() => navigate('/registro')}
               >
                 <Eye className="h-4 w-4 mr-2" />
                 Ver Todos
@@ -190,19 +191,19 @@ const Dashboard = () => {
                       No hay procesos registrados
                     </div>
                   ) : (
-                    recentProcesses.map((process) => (
-                      <div key={process.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    recentProcesses.map((process, index) => (
+                      <div key={process.nombreProceso + index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex-1">
                           <div className="font-semibold text-blue-700">{process.nombreProceso}</div>
                           <div className="text-sm text-gray-600">
                             {process.nombreSolicitante} - {process.areaDepartamento}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {formatDate(process.fechaSolicitud || process.timestamp)}
+                            {formatDate(process.fechaSolicitud)}
                           </div>
                         </div>
                         <div>
-                          {getStatusBadge(process.estado)}
+                          {getStatusBadge('En Revisión')}
                         </div>
                       </div>
                     ))
@@ -222,7 +223,7 @@ const Dashboard = () => {
                 <Button 
                   className="w-full bg-green-600 hover:bg-green-700" 
                   size="lg"
-                  onClick={() => navigate('/')}
+                  onClick={() => navigate('/nuevo-formulario')}
                 >
                   <Plus className="h-5 w-5 mr-2" />
                   Crear Nuevo Formulario
@@ -232,7 +233,7 @@ const Dashboard = () => {
                   variant="outline" 
                   className="w-full" 
                   size="lg"
-                  onClick={() => navigate('/formularios')}
+                  onClick={() => navigate('/registro')}
                 >
                   <FileText className="h-5 w-5 mr-2" />
                   Ver Registro Completo
@@ -253,24 +254,6 @@ const Dashboard = () => {
                     <div className="text-sm text-gray-600">Procesos Completados</div>
                   </Card>
                 </div>
-
-                {/* Distribución por Área */}
-                {!loading && Object.keys(stats.porArea).length > 0 && (
-                  <Card className="p-4">
-                    <h4 className="font-semibold text-sm text-gray-700 mb-3">Procesos por Área</h4>
-                    <div className="space-y-2">
-                      {Object.entries(stats.porArea)
-                        .sort(([,a], [,b]) => b - a)
-                        .slice(0, 3)
-                        .map(([area, count]) => (
-                          <div key={area} className="flex justify-between text-sm">
-                            <span className="text-gray-600">{area}</span>
-                            <span className="font-semibold text-blue-600">{count}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </Card>
-                )}
               </div>
             </CardContent>
           </Card>
