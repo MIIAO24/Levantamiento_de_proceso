@@ -211,5 +211,15 @@ export const useApiService = () => {
   return new ApiService();
 };
 
+// Función para compatibilidad con ProcessForm.tsx
+export const submitProcessForm = (formData: any) => {
+  return new ApiService().createForm(formData);
+};
+
+// Hook personalizado para usar el servicio
+export const useApiService = () => {
+  return new ApiService();
+};
+
 export default new ApiService();
 
