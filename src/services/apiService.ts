@@ -1,6 +1,50 @@
 // src/services/apiService.ts
 const API_BASE_URL = 'https://07mzej7fq9.execute-api.us-east-1.amazonaws.com/dev1';
 
+// ✅ INTERFACE CORREGIDA - debe coincidir con lo que envía el frontend
+export interface ProcessFormSubmission {
+  formData: {
+    nombreSolicitante: string;
+    areaDepartamento: string;
+    fechaSolicitud: string;
+    nombreProceso: string;
+    descripcionGeneral: string;
+    objetivoProceso: string;
+    pasosPrincipales: string;
+    herramientas: string[];
+    otrasHerramientas?: string;
+    responsableProceso: string;
+    participantesPrincipales: string;
+    clientesBeneficiarios: string;
+    reglasNegocio: string;
+    casosExcepcionales?: string;
+    procedimientosEscalamiento?: string;
+    normativasRegulatorias?: string;
+    politicasInternas?: string;
+    requisitosSeguridad?: string;
+    auditoriasControles?: string;
+    kpiMetricas?: string;
+    objetivosCuantificables?: string;
+    funcionalidadesRequeridas: string;
+    tipoInterfaz: string;
+    integracionesRequeridas?: string;
+    requisitosNoFuncionales?: string;
+    motivoLevantamiento: string[];
+    otroMotivoTexto?: string;
+    resultadosEsperados: string;
+    sistemasApoyo?: string;
+    baseDatosInvolucrados?: string;
+    integracionesExistentes?: string;
+    origenInformacion?: string;
+    destinoInformacion?: string;
+  };
+  problems: Array<{
+    id: number;
+    problema: string;
+    impacto: string;
+  }>;
+}
+
 export interface ProcessForm {
   id: string;
   nombreProceso: string;
@@ -48,12 +92,18 @@ export interface ApiResponse<T> {
 }
 
 class ApiService {
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string = '', options: RequestInit = {}): Promise<ApiResponse<T>> {
     const fullUrl = `${API_BASE_URL}${endpoint}`;
+    
+    // ✅ FIX: Convertir body a string antes de hacer substring
+    const bodyString = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+    const bodyPreview = bodyString ? bodyString.substring(0, 100) + '...' : 'none';
+    
     console.log('🌐 API Request:', { 
       fullUrl, 
       method: options.method || 'GET',
-      endpoint 
+      endpoint,
+      bodyPreview
     });
 
     try {
@@ -95,6 +145,25 @@ class ApiService {
     }
   }
 
+  // ✅ FUNCIÓN CORREGIDA - usar el tipo correcto
+  async submitProcessForm(submission: ProcessFormSubmission): Promise<ApiResponse<{
+    id: string;
+    timestamp: string;
+    processName: string;
+    savedToDatabase: boolean;
+  }>> {
+    console.log('📝 Submitting process form:', {
+      formDataKeys: Object.keys(submission.formData),
+      problemsCount: submission.problems.length,
+      nombreProceso: submission.formData.nombreProceso
+    });
+    
+    return this.request('/Form_proceso', {
+      method: 'POST',
+      body: JSON.stringify(submission), // ✅ Enviar toda la estructura
+    });
+  }
+
   // Obtener todas las formas con filtros opcionales
   async getForms(params: {
     search?: string;
@@ -128,68 +197,24 @@ class ApiService {
     return this.request<ProcessForm>(`/Form_proceso?id=${id}`);
   }
 
-  // Obtener estadísticas (usando endpoint existente)
+  // Obtener estadísticas desde el endpoint /stats
   async getStats(): Promise<ApiResponse<ProcessStats>> {
-    try {
-      // Primero obtenemos todos los formularios
-      const formsResponse = await this.getForms({ limit: 100 });
-      
-      if (!formsResponse.success) {
-        throw new Error(formsResponse.message || 'Error al obtener formularios');
-      }
-
-      const forms = formsResponse.data.items;
-      
-      // Calcular estadísticas localmente
-      const stats: ProcessStats = {
-        total: forms.length,
-        completados: forms.filter(f => f.estado === 'Completado').length,
-        enRevision: forms.filter(f => f.estado === 'En Revisión').length,
-        pendientes: forms.filter(f => f.estado === 'Pendiente').length,
-        porArea: {},
-        recientes: forms
-          .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-          .slice(0, 5)
-          .map(form => ({
-            id: form.id,
-            nombreProceso: form.nombreProceso,
-            nombreSolicitante: form.nombreSolicitante,
-            timestamp: form.timestamp
-          }))
-      };
-
-      // Calcular distribución por área
-      forms.forEach(form => {
-        const area = form.areaDepartamento || 'Sin área';
-        stats.porArea[area] = (stats.porArea[area] || 0) + 1;
-      });
-
-      return {
-        success: true,
-        data: stats
-      };
-    } catch (error) {
-      console.error('Error calculating stats:', error);
-      throw error;
-    }
+    return this.request<ProcessStats>('/stats');
   }
 
-  // Crear nueva forma
-  async createForm(formData: any): Promise<ApiResponse<{
+  // ✅ FUNCIÓN CORREGIDA - usar el tipo correcto
+  async createForm(submission: ProcessFormSubmission): Promise<ApiResponse<{
     id: string;
     timestamp: string;
     processName: string;
     savedToDatabase: boolean;
   }>> {
-    return this.request(`/Form_proceso`, {
-      method: 'POST',
-      body: JSON.stringify(formData),
-    });
+    return this.submitProcessForm(submission);
   }
 
   // Eliminar forma (implementar en Lambda si es necesario)
   async deleteForm(id: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>(`/Form_proceso`, {
+    return this.request<{ message: string }>('', {
       method: 'DELETE',
       body: JSON.stringify({ id }),
     });
@@ -207,9 +232,20 @@ class ApiService {
   }
 }
 
+// Instancia por defecto
+const apiService = new ApiService();
+
+// ✅ EXPORTAR FUNCIÓN CORREGIDA
+export const submitProcessForm = (submission: ProcessFormSubmission) => 
+  apiService.submitProcessForm(submission);
+
+export const getProcessForms = (params?: any) => apiService.getForms(params);
+export const getStats = () => apiService.getStats();
+
 // Hook personalizado para usar el servicio
 export const useApiService = () => {
-  return new ApiService();
+  return apiService;
 };
 
-export default new ApiService();
+export { apiService };
+export default apiService;

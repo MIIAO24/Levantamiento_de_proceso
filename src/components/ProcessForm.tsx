@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
-import apiService, { type ProcessForm as ProcessFormData, type ApiResponse } from '@/services/apiService';
+import apiService, { type ProcessFormSubmission } from '@/services/apiService';
 
 const formSchema = z.object({
   nombreSolicitante: z.string().min(1, 'Este campo es requerido'),
@@ -71,6 +71,7 @@ const ProcessForm = () => {
       fechaSolicitud: new Date().toISOString().split('T')[0],
       herramientas: [],
       motivoLevantamiento: [],
+      tipoInterfaz: 'appWeb'
     },
   });
 
@@ -119,25 +120,39 @@ const ProcessForm = () => {
     setIsSubmitting(true);
     
     try {
-      // Validar que los problemas tengan contenido antes de enviar
-      const validProblems = problems.filter(p => p.problema.trim() !== '' || p.impacto.trim() !== '');
+      console.log('🚀 Preparando envío del formulario...');
+      console.log('📝 Datos del formulario:', data);
+      console.log('🔍 Problemas:', problems);
       
-      console.log('Enviando datos:', { formData: data, problems: validProblems });
+      // Filtrar problemas que tengan ambos campos completados
+      const validProblems = problems.filter(p => p.problema.trim() && p.impacto.trim());
+      console.log('✅ Problemas válidos:', validProblems);
       
-
-
-      const response = await apiService.createForm(data)
-
-
+      // ✅ CORRECCIÓN: Crear la estructura correcta que espera el backend
+      const submission = {
+        formData: data,           
+        problems: validProblems   
+      } as ProcessFormSubmission;
+      
+      console.log('📤 Enviando al backend:', {
+        formDataKeys: Object.keys(submission.formData),
+        problemsCount: submission.problems.length,
+        nombreProceso: submission.formData.nombreProceso
+      });
+      
+      // ✅ CORRECCIÓN: Usar submitProcessForm en lugar de createForm
+      const response = await apiService.submitProcessForm(submission);
 
       if (response.success) {
+        console.log('🎉 Formulario enviado exitosamente:', response.data);
+        
         toast({
           title: "✅ Formulario enviado exitosamente",
-          description: "Los datos han sido registrados correctamente en el sistema.",
+          description: `Formulario "${response.data.processName}" registrado con ID: ${response.data.id}`,
           variant: "default",
         });
         
-        // Opcional: resetear el formulario después del envío exitoso
+        // Resetear el formulario después del envío exitoso
         form.reset();
         setProblems([{ id: 1, problema: '', impacto: '' }]);
         setSelectedTools([]);
@@ -150,7 +165,7 @@ const ProcessForm = () => {
       }
       
     } catch (error) {
-      console.error('Error al enviar formulario:', error);
+      console.error('❌ Error al enviar formulario:', error);
       
       toast({
         title: "❌ Error al enviar formulario",
@@ -537,6 +552,7 @@ const ProcessForm = () => {
                   <Label>Tipo de interfaz <span className="text-red-500">*</span></Label>
                   <RadioGroup 
                     onValueChange={(value) => form.setValue('tipoInterfaz', value)}
+                    defaultValue="appWeb"
                     className="flex flex-wrap gap-4 mt-2"
                     disabled={isSubmitting}
                   >
