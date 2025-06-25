@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
-import { submitProcessForm, type ProcessFormData, type ApiResponse } from '@/lib/apiService';
+import apiService, { type ProcessForm as ProcessFormData, type ApiResponse } from '@/services/apiService';
 
 const formSchema = z.object({
   nombreSolicitante: z.string().min(1, 'Este campo es requerido'),
@@ -124,8 +124,12 @@ const ProcessForm = () => {
       
       console.log('Enviando datos:', { formData: data, problems: validProblems });
       
-      const response = await submitProcessForm(data, validProblems);
-      
+
+
+      const response = await apiService.createForm(data)
+
+
+
       if (response.success) {
         toast({
           title: "✅ Formulario enviado exitosamente",
