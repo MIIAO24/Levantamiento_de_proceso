@@ -15,6 +15,8 @@ import { toast } from '@/components/ui/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ArrowLeft, Edit2, Save, RefreshCw } from 'lucide-react';
 import apiService, { type ProcessFormSubmission } from '@/services/apiService';
+import useAutoSave from '@/hooks/use-auto-save';
+import AutoSaveIndicator from '@/components/AutoSaveIndicator';
 
 const formSchema = z.object({
   nombreSolicitante: z.string().min(1, 'Este campo es requerido'),
@@ -77,6 +79,10 @@ const ProcessForm = () => {
   const [editFormId, setEditFormId] = useState<string | null>(editId || null);
   const [loading, setLoading] = useState(false);
 
+  // ✅ Estados para auto-save
+  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
+  const [autoSaveEnabled, setAutoSaveEnabled] = useState(true);
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -86,6 +92,42 @@ const ProcessForm = () => {
       tipoInterfaz: 'appWeb'
     },
   });
+
+  // ✅ CONFIGURACIÓN DEL AUTO-SAVE
+  const formData = form.watch(); // Observar todos los cambios del formulario
+  
+  // Combinar datos del formulario con problemas para auto-save
+  const autoSaveData = {
+    ...formData,
+    problems: problems.filter(p => p.problema.trim() || p.impacto.trim())
+  };
+
+  // Hook de auto-save
+  const { saveNow, isSaving, lastSaved, hasUnsavedChanges } = useAutoSave(
+    autoSaveData,
+    {
+      delay: 3000, // 3 segundos después de dejar de escribir
+      enabled: autoSaveEnabled && isEditMode, // Solo en modo edición
+      onSave: async (data) => {
+        if (!editFormId) return;
+        
+        const result = await apiService.saveDraft(data, editFormId);
+        if (!result.success) {
+          throw new Error(result.error || 'Error guardando borrador');
+        }
+        setAutoSaveError(null);
+      },
+      onError: (error) => {
+        console.error('Auto-save error:', error);
+        setAutoSaveError(error.message);
+        toast({
+          title: "⚠️ Error de guardado automático",
+          description: "Los cambios se guardarán localmente",
+          variant: "default",
+        });
+      }
+    }
+  );
 
   // FUNCIÓN PARA CARGAR DATOS DE EDICIÓN DESDE API
   useEffect(() => {
@@ -199,6 +241,9 @@ const ProcessForm = () => {
           description: `Formulario actualizado correctamente`,
         });
         
+        // ✅ Limpiar borrador después del éxito
+        clearDraftOnSuccess();
+        
         // Regresar a la lista de formularios después de 2 segundos
         setTimeout(() => {
           navigate('/dashboard');
@@ -238,6 +283,9 @@ const ProcessForm = () => {
           title: "✅ Formulario enviado exitosamente",
           description: `Formulario "${response.data.processName}" registrado con ID: ${response.data.id}`,
         });
+        
+        // ✅ Limpiar borrador después del éxito
+        clearDraftOnSuccess();
         
         // Resetear el formulario
         form.reset();
@@ -343,6 +391,32 @@ const ProcessForm = () => {
   // ✅ FIX: Crear el componente de icono dinámicamente
   const SubmitButtonIcon = isEditMode ? Save : RefreshCw;
 
+  // ✅ LIMPIAR BORRADOR AL ENVIAR EXITOSAMENTE
+  const clearDraftOnSuccess = () => {
+    if (isEditMode && editFormId) {
+      apiService.clearDraft(editFormId);
+    } else {
+      apiService.clearDraft();
+    }
+  };
+
+  // ✅ PREVENIR PÉRDIDA DE DATOS NO GUARDADOS
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges && autoSaveEnabled) {
+        e.preventDefault();
+        e.returnValue = 'Tienes cambios sin guardar. ¿Estás seguro de que quieres salir?';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges, autoSaveEnabled]);
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       {/* ✅ HEADER DINÁMICO */}
@@ -382,6 +456,19 @@ const ProcessForm = () => {
           </div>
         )}
       </div>
+
+      {/* ✅ INDICADOR DE AUTO-SAVE */}
+      {isEditMode && (
+        <div className="mb-4 flex justify-center">
+          <AutoSaveIndicator 
+            isSaving={isSaving}
+            lastSaved={lastSaved}
+            hasUnsavedChanges={hasUnsavedChanges}
+            error={autoSaveError}
+            className="bg-white px-4 py-2 rounded-lg shadow-sm border"
+          />
+        </div>
+      )}
 
       <Card className="rounded-t-none shadow-lg">
         <CardContent className="p-0">
@@ -924,7 +1011,36 @@ const ProcessForm = () => {
                   </Button>
                 )}
                 
-                <Button 
+                {/* ✅ CONTROLES DE AUTO-SAVE (solo en modo edición) */}
+                {isEditMode && (
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setAutoSaveEnabled(!autoSaveEnabled)}
+                      className="text-xs"
+                      disabled={isSubmitting}
+                      title={autoSaveEnabled ? 'Deshabilitar auto-guardado' : 'Habilitar auto-guardado'}
+                    >
+                      {autoSaveEnabled ? '🔄 Auto-save ON' : '⏸️ Auto-save OFF'}
+                    </Button>
+                    
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={saveNow}
+                      className="text-xs"
+                      disabled={isSubmitting || isSaving}
+                      title="Guardar cambios ahora"
+                    >
+                      {isSaving ? '⏳' : '💾'} Guardar ahora
+                    </Button>
+                  </div>
+                )}
+                
+                <Button
                   type="submit" 
                   className={`${isEditMode 
                     ? 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800' 
@@ -952,6 +1068,13 @@ const ProcessForm = () => {
                     ? 'Guardando los cambios realizados...'
                     : 'Por favor espere mientras se procesa su solicitud...'
                   }
+                </p>
+              )}
+              
+              {/* ✅ INFORMACIÓN SOBRE AUTO-SAVE */}
+              {isEditMode && autoSaveEnabled && (
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  💡 Los cambios se guardan automáticamente cada 3 segundos
                 </p>
               )}
             </div>

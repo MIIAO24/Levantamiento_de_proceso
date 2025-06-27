@@ -337,6 +337,107 @@ class ApiService {
     }
     throw new Error('No se encontró el formulario');
   }
+
+  // ✅ MÉTODOS PARA MANEJO DE BORRADORES
+  async saveDraft(formData: any, formId?: string): Promise<ApiResponse<any>> {
+    try {
+      console.log('💾 Saving draft...', { formId, hasData: !!formData });
+      
+      const draftData = {
+        formData,
+        isDraft: true,
+        lastModified: new Date().toISOString(),
+        formId: formId || null
+      };
+      
+      // Guardar en localStorage como backup
+      const draftKey = formId ? `draft_edit_${formId}` : 'draft_new_form';
+      localStorage.setItem(draftKey, JSON.stringify(draftData));
+      
+      // Si es un formulario existente (edición), usar PUT con flag de draft
+      if (formId) {
+        const requestBody = {
+          id: formId,
+          formData,
+          problems: formData.problems || [],
+          isDraft: true
+        };
+        
+        const result = await this.request('/Form_proceso', {
+          method: 'PUT',
+          body: JSON.stringify(requestBody),
+        });
+        
+        console.log('✅ Draft saved successfully');
+        return result;
+      } else {
+        // Para formularios nuevos, solo guardar en localStorage por ahora
+        console.log('✅ New form draft saved to localStorage');
+        return {
+          success: true,
+          data: { saved: true, location: 'localStorage' },
+          message: 'Borrador guardado localmente'
+        };
+      }
+      
+    } catch (error) {
+      console.error('❌ Error saving draft:', error);
+      
+      // Fallback: siempre guardar en localStorage si falla la API
+      const draftKey = formId ? `draft_edit_${formId}` : 'draft_new_form';
+      const fallbackData = {
+        formData,
+        isDraft: true,
+        lastModified: new Date().toISOString(),
+        formId: formId || null,
+        savedToAPI: false
+      };
+      localStorage.setItem(draftKey, JSON.stringify(fallbackData));
+      
+      return {
+        success: true,
+        data: { saved: true, location: 'localStorage', error: (error as Error).message },
+        message: 'Borrador guardado localmente (sin conexión)'
+      };
+    }
+  }
+
+  loadDraft(formId?: string): any | null {
+    try {
+      const draftKey = formId ? `draft_edit_${formId}` : 'draft_new_form';
+      const draftJson = localStorage.getItem(draftKey);
+      
+      if (!draftJson) return null;
+      
+      const draft = JSON.parse(draftJson);
+      console.log('📂 Draft loaded:', { formId, hasData: !!draft.formData });
+      
+      return draft;
+    } catch (error) {
+      console.error('❌ Error loading draft:', error);
+      return null;
+    }
+  }
+
+  clearDraft(formId?: string): void {
+    try {
+      const draftKey = formId ? `draft_edit_${formId}` : 'draft_new_form';
+      localStorage.removeItem(draftKey);
+      console.log('🗑️ Draft cleared:', draftKey);
+    } catch (error) {
+      console.error('❌ Error clearing draft:', error);
+    }
+  }
+
+  hasDraft(formId?: string): boolean {
+    try {
+      const draftKey = formId ? `draft_edit_${formId}` : 'draft_new_form';
+      return localStorage.getItem(draftKey) !== null;
+    } catch (error) {
+      console.error('❌ Error checking draft:', error);
+      return false;
+    }
+  }
 }
 
 // Instancia por defecto
