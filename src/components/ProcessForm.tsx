@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/use-toast';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { ArrowLeft, Edit2, Save, RefreshCw } from 'lucide-react';
 import apiService, { type ProcessFormSubmission } from '@/services/apiService';
 
 const formSchema = z.object({
@@ -58,12 +61,21 @@ interface Problem {
 }
 
 const ProcessForm = () => {
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  
+  // Estados principales
   const [problems, setProblems] = useState<Problem[]>([{ id: 1, problema: '', impacto: '' }]);
   const [showOtherTools, setShowOtherTools] = useState(false);
   const [showOtherMotivo, setShowOtherMotivo] = useState(false);
   const [selectedTools, setSelectedTools] = useState<string[]>([]);
   const [selectedMotivos, setSelectedMotivos] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Estados para modo edición
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormId, setEditFormId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
@@ -75,6 +87,211 @@ const ProcessForm = () => {
     },
   });
 
+  // ✅ FUNCIÓN PARA CARGAR DATOS DE EDICIÓN
+  const loadEditData = () => {
+    try {
+      const editMode = localStorage.getItem('editMode');
+      const editData = localStorage.getItem('editFormData');
+      const formId = localStorage.getItem('editFormId');
+      
+      if (editMode === 'true' && editData && formId) {
+        console.log('🔄 Cargando datos para edición...');
+        const parsedData = JSON.parse(editData);
+        
+        setIsEditMode(true);
+        setEditFormId(formId);
+        
+        // Cargar herramientas seleccionadas
+        if (parsedData.herramientas && parsedData.herramientas.length > 0) {
+          setSelectedTools(parsedData.herramientas);
+          setShowOtherTools(parsedData.herramientas.includes('otro'));
+        }
+        
+        // Cargar motivos seleccionados
+        if (parsedData.motivoLevantamiento && parsedData.motivoLevantamiento.length > 0) {
+          setSelectedMotivos(parsedData.motivoLevantamiento);
+          setShowOtherMotivo(parsedData.motivoLevantamiento.includes('otroMotivo'));
+        }
+        
+        // Cargar problemas
+        if (parsedData.problems && parsedData.problems.length > 0) {
+          setProblems(parsedData.problems);
+        }
+        
+        // Cargar todos los datos del formulario
+        form.reset({
+          nombreSolicitante: parsedData.nombreSolicitante || '',
+          areaDepartamento: parsedData.areaDepartamento || '',
+          fechaSolicitud: parsedData.fechaSolicitud || '',
+          nombreProceso: parsedData.nombreProceso || '',
+          descripcionGeneral: parsedData.descripcionGeneral || '',
+          objetivoProceso: parsedData.objetivoProceso || '',
+          pasosPrincipales: parsedData.pasosPrincipales || '',
+          herramientas: parsedData.herramientas || [],
+          otrasHerramientas: parsedData.otrasHerramientas || '',
+          responsableProceso: parsedData.responsableProceso || '',
+          participantesPrincipales: parsedData.participantesPrincipales || '',
+          clientesBeneficiarios: parsedData.clientesBeneficiarios || '',
+          reglasNegocio: parsedData.reglasNegocio || '',
+          casosExcepcionales: parsedData.casosExcepcionales || '',
+          procedimientosEscalamiento: parsedData.procedimientosEscalamiento || '',
+          normativasRegulatorias: parsedData.normativasRegulatorias || '',
+          politicasInternas: parsedData.politicasInternas || '',
+          requisitosSeguridad: parsedData.requisitosSeguridad || '',
+          auditoriasControles: parsedData.auditoriasControles || '',
+          kpiMetricas: parsedData.kpiMetricas || '',
+          objetivosCuantificables: parsedData.objetivosCuantificables || '',
+          funcionalidadesRequeridas: parsedData.funcionalidadesRequeridas || '',
+          tipoInterfaz: parsedData.tipoInterfaz || 'appWeb',
+          integracionesRequeridas: parsedData.integracionesRequeridas || '',
+          requisitosNoFuncionales: parsedData.requisitosNoFuncionales || '',
+          motivoLevantamiento: parsedData.motivoLevantamiento || [],
+          otroMotivoTexto: parsedData.otroMotivoTexto || '',
+          resultadosEsperados: parsedData.resultadosEsperados || '',
+          sistemasApoyo: parsedData.sistemasApoyo || '',
+          baseDatosInvolucrados: parsedData.baseDatosInvolucrados || '',
+          integracionesExistentes: parsedData.integracionesExistentes || '',
+          origenInformacion: parsedData.origenInformacion || '',
+          destinoInformacion: parsedData.destinoInformacion || ''
+        });
+        
+        console.log('✅ Datos de edición cargados correctamente');
+        
+        // Limpiar localStorage después de cargar
+        localStorage.removeItem('editFormData');
+        localStorage.removeItem('editMode');
+        localStorage.removeItem('editFormId');
+        
+        toast({
+          title: "📝 Modo edición",
+          description: `Editando formulario: ${parsedData.nombreProceso}`,
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error cargando datos de edición:', error);
+      toast({
+        title: "❌ Error",
+        description: "No se pudieron cargar los datos para edición",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // ✅ FUNCIÓN PARA ACTUALIZAR FORMULARIO
+  const updateForm = async (data: FormData) => {
+    if (!editFormId) {
+      throw new Error('No se encontró el ID del formulario para actualizar');
+    }
+    
+    try {
+      console.log('🔄 Actualizando formulario:', editFormId);
+      
+      // Filtrar problemas válidos
+      const validProblems = problems.filter(p => p.problema.trim() && p.impacto.trim());
+      
+      const submission: ProcessFormSubmission = {
+        formData: data,
+        problems: validProblems
+      };
+      
+      const response = await apiService.updateForm(editFormId, submission);
+      
+      if (response.success) {
+        console.log('✅ Formulario actualizado exitosamente:', response.data);
+        
+        toast({
+          title: "✅ Formulario actualizado",
+          description: `"${response.data.processName}" se ha actualizado correctamente`,
+        });
+        
+        // Regresar a la lista de formularios después de 2 segundos
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 2000);
+        
+        return response;
+      } else {
+        throw new Error(response.error || 'Error desconocido al actualizar');
+      }
+    } catch (error) {
+      console.error('❌ Error actualizando formulario:', error);
+      throw error;
+    }
+  };
+
+  // ✅ FUNCIÓN PARA CREAR FORMULARIO (original)
+  const createForm = async (data: FormData) => {
+    try {
+      console.log('🚀 Creando nuevo formulario...');
+      
+      // Filtrar problemas válidos
+      const validProblems = problems.filter(p => p.problema.trim() && p.impacto.trim());
+      
+      const submission: ProcessFormSubmission = {
+        formData: data,
+        problems: validProblems
+      };
+      
+      const response = await apiService.submitProcessForm(submission);
+      
+      if (response.success) {
+        console.log('🎉 Formulario creado exitosamente:', response.data);
+        
+        toast({
+          title: "✅ Formulario enviado exitosamente",
+          description: `Formulario "${response.data.processName}" registrado con ID: ${response.data.id}`,
+        });
+        
+        // Resetear el formulario
+        form.reset();
+        setProblems([{ id: 1, problema: '', impacto: '' }]);
+        setSelectedTools([]);
+        setSelectedMotivos([]);
+        setShowOtherTools(false);
+        setShowOtherMotivo(false);
+        
+        return response;
+      } else {
+        throw new Error(response.error || 'Error desconocido');
+      }
+    } catch (error) {
+      console.error('❌ Error creando formulario:', error);
+      throw error;
+    }
+  };
+
+  // ✅ FUNCIÓN DE ENVÍO PRINCIPAL (modificada)
+  const onSubmit = async (data: FormData) => {
+    setIsSubmitting(true);
+    
+    try {
+      if (isEditMode) {
+        await updateForm(data);
+      } else {
+        await createForm(data);
+      }
+    } catch (error) {
+      console.error('❌ Error al procesar formulario:', error);
+      
+      toast({
+        title: "❌ Error al procesar formulario",
+        description: error instanceof Error ? error.message : "Ocurrió un error inesperado. Por favor, intente nuevamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ✅ DETECTAR MODO EDICIÓN AL CARGAR
+  useEffect(() => {
+    const isEdit = searchParams.get('edit') === 'true';
+    if (isEdit) {
+      loadEditData();
+    }
+  }, [searchParams]);
+
+  // Funciones auxiliares (sin cambios)
   const addProblem = () => {
     const newId = Math.max(...problems.map(p => p.id)) + 1;
     setProblems([...problems, { id: newId, problema: '', impacto: '' }]);
@@ -116,67 +333,6 @@ const ProcessForm = () => {
     }
   };
 
-  const onSubmit = async (data: FormData) => {
-    setIsSubmitting(true);
-    
-    try {
-      console.log('🚀 Preparando envío del formulario...');
-      console.log('📝 Datos del formulario:', data);
-      console.log('🔍 Problemas:', problems);
-      
-      // Filtrar problemas que tengan ambos campos completados
-      const validProblems = problems.filter(p => p.problema.trim() && p.impacto.trim());
-      console.log('✅ Problemas válidos:', validProblems);
-      
-      // ✅ CORRECCIÓN: Crear la estructura correcta que espera el backend
-      const submission = {
-        formData: data,           
-        problems: validProblems   
-      } as ProcessFormSubmission;
-      
-      console.log('📤 Enviando al backend:', {
-        formDataKeys: Object.keys(submission.formData),
-        problemsCount: submission.problems.length,
-        nombreProceso: submission.formData.nombreProceso
-      });
-      
-      // ✅ CORRECCIÓN: Usar submitProcessForm en lugar de createForm
-      const response = await apiService.submitProcessForm(submission);
-
-      if (response.success) {
-        console.log('🎉 Formulario enviado exitosamente:', response.data);
-        
-        toast({
-          title: "✅ Formulario enviado exitosamente",
-          description: `Formulario "${response.data.processName}" registrado con ID: ${response.data.id}`,
-          variant: "default",
-        });
-        
-        // Resetear el formulario después del envío exitoso
-        form.reset();
-        setProblems([{ id: 1, problema: '', impacto: '' }]);
-        setSelectedTools([]);
-        setSelectedMotivos([]);
-        setShowOtherTools(false);
-        setShowOtherMotivo(false);
-        
-      } else {
-        throw new Error(response.error || 'Error desconocido');
-      }
-      
-    } catch (error) {
-      console.error('❌ Error al enviar formulario:', error);
-      
-      toast({
-        title: "❌ Error al enviar formulario",
-        description: error instanceof Error ? error.message : "Ocurrió un error inesperado. Por favor, intente nuevamente.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const SectionHeader = ({ icon, title }: { icon: string; title: string }) => (
     <div className="flex items-center gap-3 mb-6">
       <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center text-white text-lg">
@@ -186,12 +342,56 @@ const ProcessForm = () => {
     </div>
   );
 
+  // ✅ VARIABLES DINÁMICAS PARA UI
+  const pageTitle = isEditMode 
+    ? "Editar Formulario de Levantamiento de Proceso"
+    : "Formulario de Levantamiento de Proceso";
+    
+  const submitButtonText = isEditMode
+    ? "Actualizar Formulario"
+    : "Enviar Formulario";
+    
+  // ✅ FIX: Crear el componente de icono dinámicamente
+  const SubmitButtonIcon = isEditMode ? Save : RefreshCw;
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-blue-700 to-blue-800 text-white p-10 rounded-t-xl text-center mb-0">
-        <h1 className="text-3xl font-bold mb-3">Formulario de Levantamiento de Proceso</h1>
-        <p className="text-lg opacity-90">Complete la información solicitada para documentar el proceso</p>
+      {/* ✅ HEADER DINÁMICO */}
+      <div className={`${isEditMode ? 'bg-gradient-to-r from-orange-600 to-orange-700' : 'bg-gradient-to-r from-blue-700 to-blue-800'} text-white p-10 rounded-t-xl text-center mb-0 relative`}>
+        {isEditMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate('/dashboard')}
+            className="absolute left-6 top-6 text-white hover:bg-white/10"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver
+          </Button>
+        )}
+        
+        <div className="flex items-center justify-center gap-3 mb-3">
+          {isEditMode && <Edit2 className="h-8 w-8" />}
+          <h1 className="text-3xl font-bold">{pageTitle}</h1>
+        </div>
+        
+        <p className="text-lg opacity-90">
+          {isEditMode 
+            ? "Modifique los campos necesarios y guarde los cambios"
+            : "Complete la información solicitada para documentar el proceso"
+          }
+        </p>
+        
+        {isEditMode && (
+          <div className="mt-4">
+            <Alert className="bg-orange-100 border-orange-300 text-orange-800 max-w-md mx-auto">
+              <Edit2 className="h-4 w-4" />
+              <AlertDescription>
+                Modo edición activo. Los cambios se guardarán sobre el formulario existente.
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
       </div>
 
       <Card className="rounded-t-none shadow-lg">
@@ -552,7 +752,7 @@ const ProcessForm = () => {
                   <Label>Tipo de interfaz <span className="text-red-500">*</span></Label>
                   <RadioGroup 
                     onValueChange={(value) => form.setValue('tipoInterfaz', value)}
-                    defaultValue="appWeb"
+                    value={form.watch('tipoInterfaz')}
                     className="flex flex-wrap gap-4 mt-2"
                     disabled={isSubmitting}
                   >
@@ -719,26 +919,50 @@ const ProcessForm = () => {
               </div>
             </div>
 
-            {/* Botón de envío */}
+            {/* ✅ BOTÓN DE ENVÍO DINÁMICO */}
             <div className="p-8 text-center">
-              <Button 
-                type="submit" 
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-12 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 relative"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    Enviando...
-                  </>
-                ) : (
-                  'Enviar Formulario'
+              <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                {isEditMode && (
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/dashboard')}
+                    className="px-8 py-3"
+                    disabled={isSubmitting}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Cancelar
+                  </Button>
                 )}
-              </Button>
+                
+                <Button 
+                  type="submit" 
+                  className={`${isEditMode 
+                    ? 'bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800' 
+                    : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800'
+                  } text-white px-12 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 relative`}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      {isEditMode ? 'Actualizando...' : 'Enviando...'}
+                    </>
+                  ) : (
+                    <>
+                      <SubmitButtonIcon className="h-5 w-5 mr-2" />
+                      {submitButtonText}
+                    </>
+                  )}
+                </Button>
+              </div>
               
               {isSubmitting && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Por favor espere mientras se procesa su solicitud...
+                <p className="text-sm text-gray-600 mt-4">
+                  {isEditMode 
+                    ? 'Guardando los cambios realizados...'
+                    : 'Por favor espere mientras se procesa su solicitud...'
+                  }
                 </p>
               )}
             </div>

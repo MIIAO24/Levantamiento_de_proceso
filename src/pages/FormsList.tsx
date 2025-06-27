@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
@@ -20,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, RefreshCw, Eye, Trash2, FileText } from 'lucide-react'
+import { Search, RefreshCw, Eye, Trash2, FileText, Edit2 } from 'lucide-react'
 import { apiService } from '@/services/apiService'
 
 interface ProcessForm {
@@ -81,11 +82,13 @@ interface ApiResponse {
 }
 
 const FormsList: React.FC = () => {
+  const navigate = useNavigate()
   const [forms, setForms] = useState<ProcessForm[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedForm, setSelectedForm] = useState<ProcessForm | null>(null)
+  const [editingForm, setEditingForm] = useState<ProcessForm | null>(null)
   const [stats, setStats] = useState({
     total: 0,
     completados: 0,
@@ -160,6 +163,79 @@ const FormsList: React.FC = () => {
       console.error('❌ Error:', err)
       alert('Error al cargar los detalles')
     }
+  }
+
+  const handleEdit = (form: ProcessForm) => {
+    console.log('🖊️ Editando formulario:', form.id)
+    
+    // Cerrar el modal de vista de detalles
+    setSelectedForm(null)
+    
+    // Preparar los datos para edición
+    const formDataForEdit = {
+      // Información General
+      nombreProceso: form.nombreProceso || '',
+      nombreSolicitante: form.nombreSolicitante || '',
+      areaDepartamento: form.areaDepartamento || '',
+      fechaSolicitud: form.fechaSolicitud || '',
+      
+      // Descripción del Proceso
+      descripcionGeneral: form.descripcionGeneral || '',
+      objetivoProceso: form.objetivoProceso || '',
+      pasosPrincipales: form.pasosPrincipales || '',
+      herramientas: form.herramientas || [],
+      otrasHerramientas: form.otrasHerramientas || '',
+      
+      // Participantes y Responsables
+      responsableProceso: form.responsableProceso || '',
+      participantesPrincipales: form.participantesPrincipales || '',
+      clientesBeneficiarios: form.clientesBeneficiarios || '',
+      
+      // Reglas de Negocio
+      reglasNegocio: form.reglasNegocio || '',
+      casosExcepcionales: form.casosExcepcionales || '',
+      procedimientosEscalamiento: form.procedimientosEscalamiento || '',
+      normativasRegulatorias: form.normativasRegulatorias || '',
+      politicasInternas: form.politicasInternas || '',
+      requisitosSeguridad: form.requisitosSeguridad || '',
+      auditoriasControles: form.auditoriasControles || '',
+      
+      // Métricas y Objetivos
+      kpiMetricas: form.kpiMetricas || '',
+      objetivosCuantificables: form.objetivosCuantificables || '',
+      
+      // Problemas y Oportunidades
+      problems: form.problems || [],
+      
+      // Especificaciones de la Solución
+      funcionalidadesRequeridas: form.funcionalidadesRequeridas || '',
+      tipoInterfaz: form.tipoInterfaz || '',
+      integracionesRequeridas: form.integracionesRequeridas || '',
+      requisitosNoFuncionales: form.requisitosNoFuncionales || '',
+      motivoLevantamiento: form.motivoLevantamiento || [],
+      otroMotivoTexto: form.otroMotivoTexto || '',
+      resultadosEsperados: form.resultadosEsperados || '',
+      
+      // Información Técnica y de Sistemas
+      sistemasApoyo: form.sistemasApoyo || '',
+      baseDatosInvolucrados: form.baseDatosInvolucrados || '',
+      integracionesExistentes: form.integracionesExistentes || '',
+      origenInformacion: form.origenInformacion || '',
+      destinoInformacion: form.destinoInformacion || '',
+      
+      // Metadatos
+      id: form.id,
+      timestamp: form.timestamp,
+      estado: form.estado
+    }
+    
+    // Guardar los datos en localStorage para que el formulario los pueda usar
+    localStorage.setItem('editFormData', JSON.stringify(formDataForEdit))
+    localStorage.setItem('editMode', 'true')
+    localStorage.setItem('editFormId', form.id)
+    
+    // Redirigir al formulario en modo edición
+    navigate('/formularios?edit=true')
   }
 
   useEffect(() => {
@@ -647,10 +723,11 @@ const FormsList: React.FC = () => {
             <Button variant="outline" onClick={() => setSelectedForm(null)}>
               Cerrar
             </Button>
-            <Button onClick={() => {
-              // Aquí puedes agregar lógica para editar
-              console.log('Editar formulario:', selectedForm?.id);
-            }}>
+            <Button 
+              onClick={() => handleEdit(selectedForm!)}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Edit2 className="h-4 w-4 mr-2" />
               Editar
             </Button>
           </DialogFooter>

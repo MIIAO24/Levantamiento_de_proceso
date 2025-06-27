@@ -1,22 +1,22 @@
 // src/services/apiService.ts
 const API_BASE_URL = 'https://07mzej7fq9.execute-api.us-east-1.amazonaws.com/dev1';
 
-// ✅ INTERFACE CORREGIDA - debe coincidir con lo que envía el frontend
+// ✅ INTERFACE CORREGIDA - campos opcionales para máxima flexibilidad
 export interface ProcessFormSubmission {
   formData: {
-    nombreSolicitante: string;
-    areaDepartamento: string;
-    fechaSolicitud: string;
-    nombreProceso: string;
-    descripcionGeneral: string;
-    objetivoProceso: string;
-    pasosPrincipales: string;
-    herramientas: string[];
+    nombreSolicitante?: string;
+    areaDepartamento?: string;
+    fechaSolicitud?: string;
+    nombreProceso?: string;
+    descripcionGeneral?: string;
+    objetivoProceso?: string;
+    pasosPrincipales?: string;
+    herramientas?: string[];
     otrasHerramientas?: string;
-    responsableProceso: string;
-    participantesPrincipales: string;
-    clientesBeneficiarios: string;
-    reglasNegocio: string;
+    responsableProceso?: string;
+    participantesPrincipales?: string;
+    clientesBeneficiarios?: string;
+    reglasNegocio?: string;
     casosExcepcionales?: string;
     procedimientosEscalamiento?: string;
     normativasRegulatorias?: string;
@@ -25,24 +25,71 @@ export interface ProcessFormSubmission {
     auditoriasControles?: string;
     kpiMetricas?: string;
     objetivosCuantificables?: string;
-    funcionalidadesRequeridas: string;
-    tipoInterfaz: string;
+    funcionalidadesRequeridas?: string;
+    tipoInterfaz?: string;
     integracionesRequeridas?: string;
     requisitosNoFuncionales?: string;
-    motivoLevantamiento: string[];
+    motivoLevantamiento?: string[];
     otroMotivoTexto?: string;
-    resultadosEsperados: string;
+    resultadosEsperados?: string;
     sistemasApoyo?: string;
     baseDatosInvolucrados?: string;
     integracionesExistentes?: string;
     origenInformacion?: string;
     destinoInformacion?: string;
   };
-  problems: Array<{
+  problems?: Array<{
     id: number;
     problema: string;
     impacto: string;
   }>;
+}
+
+// ✅ INTERFACE PARA ACTUALIZACIÓN - también con campos opcionales
+export interface ProcessFormUpdate {
+  id: string;
+  formData: {
+    nombreSolicitante?: string;
+    areaDepartamento?: string;
+    fechaSolicitud?: string;
+    nombreProceso?: string;
+    descripcionGeneral?: string;
+    objetivoProceso?: string;
+    pasosPrincipales?: string;
+    herramientas?: string[];
+    otrasHerramientas?: string;
+    responsableProceso?: string;
+    participantesPrincipales?: string;
+    clientesBeneficiarios?: string;
+    reglasNegocio?: string;
+    casosExcepcionales?: string;
+    procedimientosEscalamiento?: string;
+    normativasRegulatorias?: string;
+    politicasInternas?: string;
+    requisitosSeguridad?: string;
+    auditoriasControles?: string;
+    kpiMetricas?: string;
+    objetivosCuantificables?: string;
+    funcionalidadesRequeridas?: string;
+    tipoInterfaz?: string;
+    integracionesRequeridas?: string;
+    requisitosNoFuncionales?: string;
+    motivoLevantamiento?: string[];
+    otroMotivoTexto?: string;
+    resultadosEsperados?: string;
+    sistemasApoyo?: string;
+    baseDatosInvolucrados?: string;
+    integracionesExistentes?: string;
+    origenInformacion?: string;
+    destinoInformacion?: string;
+  };
+  problems?: Array<{
+    id: number;
+    problema: string;
+    impacto: string;
+  }>;
+  timestamp: string;
+  updatedAt: string;
 }
 
 export interface ProcessForm {
@@ -154,13 +201,34 @@ class ApiService {
   }>> {
     console.log('📝 Submitting process form:', {
       formDataKeys: Object.keys(submission.formData),
-      problemsCount: submission.problems.length,
+      problemsCount: submission.problems?.length || 0,
       nombreProceso: submission.formData.nombreProceso
     });
     
     return this.request('/Form_proceso', {
       method: 'POST',
       body: JSON.stringify(submission), // ✅ Enviar toda la estructura
+    });
+  }
+
+  // ✅ FUNCIÓN PARA ACTUALIZAR FORMULARIOS
+  async updateProcessForm(updateData: ProcessFormUpdate): Promise<ApiResponse<{
+    id: string;
+    timestamp: string;
+    processName: string;
+    updated: boolean;
+    message: string;
+  }>> {
+    console.log('🔄 Updating process form:', {
+      id: updateData.id,
+      formDataKeys: Object.keys(updateData.formData),
+      problemsCount: updateData.problems?.length || 0,
+      nombreProceso: updateData.formData.nombreProceso
+    });
+    
+    return this.request('/Form_proceso', {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
     });
   }
 
@@ -212,6 +280,25 @@ class ApiService {
     return this.submitProcessForm(submission);
   }
 
+  // ✅ FUNCIÓN PARA ACTUALIZAR (alias más claro)
+  async updateForm(id: string, submission: ProcessFormSubmission): Promise<ApiResponse<{
+    id: string;
+    timestamp: string;
+    processName: string;
+    updated: boolean;
+    message: string;
+  }>> {
+    const updateData: ProcessFormUpdate = {
+      id,
+      formData: submission.formData,
+      problems: submission.problems || [],
+      timestamp: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    
+    return this.updateProcessForm(updateData);
+  }
+
   // Eliminar forma (implementar en Lambda si es necesario)
   async deleteForm(id: string): Promise<ApiResponse<{ message: string }>> {
     return this.request<{ message: string }>('', {
@@ -238,6 +325,10 @@ const apiService = new ApiService();
 // ✅ EXPORTAR FUNCIÓN CORREGIDA
 export const submitProcessForm = (submission: ProcessFormSubmission) => 
   apiService.submitProcessForm(submission);
+
+// ✅ NUEVA EXPORTACIÓN PARA ACTUALIZAR
+export const updateProcessForm = (updateData: ProcessFormUpdate) => 
+  apiService.updateProcessForm(updateData);
 
 export const getProcessForms = (params?: any) => apiService.getForms(params);
 export const getStats = () => apiService.getStats();
