@@ -169,7 +169,15 @@ class ApiService {
         ok: response.ok
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Error parsing JSON response:', jsonError);
+        throw new Error(`Error parsing response: ${response.status} ${response.statusText}`);
+      }
+      
+      console.log('📥 Response Data:', data);
       
       if (!response.ok) {
         console.error('❌ API Error:', {
@@ -177,12 +185,12 @@ class ApiService {
           status: response.status,
           data
         });
-        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+        throw new Error(data.message || data.error || `HTTP error! status: ${response.status}`);
       }
 
       console.log('✅ API Success:', {
         url: fullUrl,
-        dataKeys: Object.keys(data)
+        dataKeys: data ? Object.keys(data) : []
       });
 
       return data;
@@ -281,22 +289,25 @@ class ApiService {
   }
 
   // ✅ FUNCIÓN PARA ACTUALIZAR (alias más claro)
-  async updateForm(id: string, submission: ProcessFormSubmission): Promise<ApiResponse<{
+  async updateForm(id: string, updateData: any): Promise<ApiResponse<{
     id: string;
     timestamp: string;
     processName: string;
     updated: boolean;
     message: string;
   }>> {
-    const updateData: ProcessFormUpdate = {
+    console.log('🔄 Sending PUT request with data:', {
       id,
-      formData: submission.formData,
-      problems: submission.problems || [],
-      timestamp: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
+      formDataKeys: Object.keys(updateData.formData || {}),
+      problemsCount: (updateData.problems || []).length,
+      hasId: !!updateData.id
+    });
     
-    return this.updateProcessForm(updateData);
+    // Enviar directamente el updateData que ya incluye el id, formData y problems
+    return this.request('/Form_proceso', {
+      method: 'PUT',
+      body: JSON.stringify(updateData),
+    });
   }
 
   // Eliminar forma (implementar en Lambda si es necesario)
@@ -316,6 +327,15 @@ class ApiService {
     tableName: string;
   }>> {
     return this.request('/test-db');
+  }
+
+  // Obtener un formulario por ID
+  async getProcessFormById(id: string): Promise<ProcessForm> {
+    const res = await this.request<ProcessForm>(`/Form_proceso?id=${id}`);
+    if (res.success && res.data) {
+      return res.data;
+    }
+    throw new Error('No se encontró el formulario');
   }
 }
 

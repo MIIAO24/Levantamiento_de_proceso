@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,7 +62,7 @@ interface Problem {
 
 const ProcessForm = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const { id: editId } = useParams();
   
   // Estados principales
   const [problems, setProblems] = useState<Problem[]>([{ id: 1, problema: '', impacto: '' }]);
@@ -73,8 +73,8 @@ const ProcessForm = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Estados para modo edición
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [editFormId, setEditFormId] = useState<string | null>(null);
+  const [isEditMode, setIsEditMode] = useState(!!editId);
+  const [editFormId, setEditFormId] = useState<string | null>(editId || null);
   const [loading, setLoading] = useState(false);
 
   const form = useForm<FormData>({
@@ -87,95 +87,77 @@ const ProcessForm = () => {
     },
   });
 
-  // ✅ FUNCIÓN PARA CARGAR DATOS DE EDICIÓN
-  const loadEditData = () => {
-    try {
-      const editMode = localStorage.getItem('editMode');
-      const editData = localStorage.getItem('editFormData');
-      const formId = localStorage.getItem('editFormId');
-      
-      if (editMode === 'true' && editData && formId) {
-        console.log('🔄 Cargando datos para edición...');
-        const parsedData = JSON.parse(editData);
-        
-        setIsEditMode(true);
-        setEditFormId(formId);
-        
-        // Cargar herramientas seleccionadas
-        if (parsedData.herramientas && parsedData.herramientas.length > 0) {
-          setSelectedTools(parsedData.herramientas);
-          setShowOtherTools(parsedData.herramientas.includes('otro'));
-        }
-        
-        // Cargar motivos seleccionados
-        if (parsedData.motivoLevantamiento && parsedData.motivoLevantamiento.length > 0) {
-          setSelectedMotivos(parsedData.motivoLevantamiento);
-          setShowOtherMotivo(parsedData.motivoLevantamiento.includes('otroMotivo'));
-        }
-        
-        // Cargar problemas
-        if (parsedData.problems && parsedData.problems.length > 0) {
-          setProblems(parsedData.problems);
-        }
-        
-        // Cargar todos los datos del formulario
-        form.reset({
-          nombreSolicitante: parsedData.nombreSolicitante || '',
-          areaDepartamento: parsedData.areaDepartamento || '',
-          fechaSolicitud: parsedData.fechaSolicitud || '',
-          nombreProceso: parsedData.nombreProceso || '',
-          descripcionGeneral: parsedData.descripcionGeneral || '',
-          objetivoProceso: parsedData.objetivoProceso || '',
-          pasosPrincipales: parsedData.pasosPrincipales || '',
-          herramientas: parsedData.herramientas || [],
-          otrasHerramientas: parsedData.otrasHerramientas || '',
-          responsableProceso: parsedData.responsableProceso || '',
-          participantesPrincipales: parsedData.participantesPrincipales || '',
-          clientesBeneficiarios: parsedData.clientesBeneficiarios || '',
-          reglasNegocio: parsedData.reglasNegocio || '',
-          casosExcepcionales: parsedData.casosExcepcionales || '',
-          procedimientosEscalamiento: parsedData.procedimientosEscalamiento || '',
-          normativasRegulatorias: parsedData.normativasRegulatorias || '',
-          politicasInternas: parsedData.politicasInternas || '',
-          requisitosSeguridad: parsedData.requisitosSeguridad || '',
-          auditoriasControles: parsedData.auditoriasControles || '',
-          kpiMetricas: parsedData.kpiMetricas || '',
-          objetivosCuantificables: parsedData.objetivosCuantificables || '',
-          funcionalidadesRequeridas: parsedData.funcionalidadesRequeridas || '',
-          tipoInterfaz: parsedData.tipoInterfaz || 'appWeb',
-          integracionesRequeridas: parsedData.integracionesRequeridas || '',
-          requisitosNoFuncionales: parsedData.requisitosNoFuncionales || '',
-          motivoLevantamiento: parsedData.motivoLevantamiento || [],
-          otroMotivoTexto: parsedData.otroMotivoTexto || '',
-          resultadosEsperados: parsedData.resultadosEsperados || '',
-          sistemasApoyo: parsedData.sistemasApoyo || '',
-          baseDatosInvolucrados: parsedData.baseDatosInvolucrados || '',
-          integracionesExistentes: parsedData.integracionesExistentes || '',
-          origenInformacion: parsedData.origenInformacion || '',
-          destinoInformacion: parsedData.destinoInformacion || ''
-        });
-        
-        console.log('✅ Datos de edición cargados correctamente');
-        
-        // Limpiar localStorage después de cargar
-        localStorage.removeItem('editFormData');
-        localStorage.removeItem('editMode');
-        localStorage.removeItem('editFormId');
-        
-        toast({
-          title: "📝 Modo edición",
-          description: `Editando formulario: ${parsedData.nombreProceso}`,
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error cargando datos de edición:', error);
-      toast({
-        title: "❌ Error",
-        description: "No se pudieron cargar los datos para edición",
-        variant: "destructive",
-      });
+  // FUNCIÓN PARA CARGAR DATOS DE EDICIÓN DESDE API
+  useEffect(() => {
+    if (editId) {
+      setIsEditMode(true);
+      setEditFormId(editId);
+      setLoading(true);
+      apiService.getProcessFormById(editId)
+        .then((formData) => {
+          if (!formData) throw new Error('No se encontró el formulario');
+          // Cargar herramientas seleccionadas
+          if (formData.herramientas && formData.herramientas.length > 0) {
+            setSelectedTools(formData.herramientas);
+            setShowOtherTools(formData.herramientas.includes('otro'));
+          }
+          // Cargar motivos seleccionados
+          if (formData.motivoLevantamiento && formData.motivoLevantamiento.length > 0) {
+            setSelectedMotivos(formData.motivoLevantamiento);
+            setShowOtherMotivo(formData.motivoLevantamiento.includes('otroMotivo'));
+          }
+          // Cargar problemas
+          if (formData.problems && formData.problems.length > 0) {
+            setProblems(formData.problems);
+          }
+          // Cargar todos los datos del formulario
+          form.reset({
+            nombreSolicitante: formData.nombreSolicitante || '',
+            areaDepartamento: formData.areaDepartamento || '',
+            fechaSolicitud: formData.fechaSolicitud || '',
+            nombreProceso: formData.nombreProceso || '',
+            descripcionGeneral: formData.descripcionGeneral || '',
+            objetivoProceso: formData.objetivoProceso || '',
+            pasosPrincipales: formData.pasosPrincipales || '',
+            herramientas: formData.herramientas || [],
+            otrasHerramientas: formData.otrasHerramientas || '',
+            responsableProceso: formData.responsableProceso || '',
+            participantesPrincipales: formData.participantesPrincipales || '',
+            clientesBeneficiarios: formData.clientesBeneficiarios || '',
+            reglasNegocio: formData.reglasNegocio || '',
+            casosExcepcionales: formData.casosExcepcionales || '',
+            procedimientosEscalamiento: formData.procedimientosEscalamiento || '',
+            normativasRegulatorias: formData.normativasRegulatorias || '',
+            politicasInternas: formData.politicasInternas || '',
+            requisitosSeguridad: formData.requisitosSeguridad || '',
+            auditoriasControles: formData.auditoriasControles || '',
+            kpiMetricas: formData.kpiMetricas || '',
+            objetivosCuantificables: formData.objetivosCuantificables || '',
+            funcionalidadesRequeridas: formData.funcionalidadesRequeridas || '',
+            tipoInterfaz: formData.tipoInterfaz || 'appWeb',
+            integracionesRequeridas: formData.integracionesRequeridas || '',
+            requisitosNoFuncionales: formData.requisitosNoFuncionales || '',
+            motivoLevantamiento: formData.motivoLevantamiento || [],
+            otroMotivoTexto: formData.otroMotivoTexto || '',
+            resultadosEsperados: formData.resultadosEsperados || '',
+            sistemasApoyo: formData.sistemasApoyo || '',
+            baseDatosInvolucrados: formData.baseDatosInvolucrados || '',
+            integracionesExistentes: formData.integracionesExistentes || '',
+            origenInformacion: formData.origenInformacion || '',
+            destinoInformacion: formData.destinoInformacion || ''
+          });
+        })
+        .catch((error) => {
+          toast({
+            title: '❌ Error',
+            description: error.message || 'No se pudieron cargar los datos para edición',
+            variant: 'destructive',
+          });
+          navigate('/formularios');
+        })
+        .finally(() => setLoading(false));
     }
-  };
+  }, [editId]);
 
   // ✅ FUNCIÓN PARA ACTUALIZAR FORMULARIO
   const updateForm = async (data: FormData) => {
@@ -185,23 +167,36 @@ const ProcessForm = () => {
     
     try {
       console.log('🔄 Actualizando formulario:', editFormId);
+      console.log('📋 Datos del formulario:', data);
       
       // Filtrar problemas válidos
       const validProblems = problems.filter(p => p.problema.trim() && p.impacto.trim());
+      console.log('⚠️ Problemas válidos:', validProblems);
       
-      const submission: ProcessFormSubmission = {
+      // Crear el objeto en formato correcto para la Lambda PUT
+      // Debe incluir el ID y seguir la misma estructura que POST
+      const updateData = {
+        id: editFormId,
         formData: data,
         problems: validProblems
       };
       
-      const response = await apiService.updateForm(editFormId, submission);
+      console.log('📤 Enviando datos de actualización:', {
+        id: updateData.id,
+        formDataKeys: Object.keys(updateData.formData),
+        problemsCount: updateData.problems.length
+      });
+      
+      const response = await apiService.updateForm(editFormId, updateData);
+      
+      console.log('📥 Respuesta recibida:', response);
       
       if (response.success) {
         console.log('✅ Formulario actualizado exitosamente:', response.data);
         
         toast({
           title: "✅ Formulario actualizado",
-          description: `"${response.data.processName}" se ha actualizado correctamente`,
+          description: `Formulario actualizado correctamente`,
         });
         
         // Regresar a la lista de formularios después de 2 segundos
@@ -211,10 +206,12 @@ const ProcessForm = () => {
         
         return response;
       } else {
-        throw new Error(response.error || 'Error desconocido al actualizar');
+        console.error('❌ Error en respuesta:', response);
+        throw new Error(response.error || response.message || 'Error desconocido al actualizar');
       }
     } catch (error) {
       console.error('❌ Error actualizando formulario:', error);
+      console.error('❌ Error stack:', error.stack);
       throw error;
     }
   };
@@ -282,14 +279,6 @@ const ProcessForm = () => {
       setIsSubmitting(false);
     }
   };
-
-  // ✅ DETECTAR MODO EDICIÓN AL CARGAR
-  useEffect(() => {
-    const isEdit = searchParams.get('edit') === 'true';
-    if (isEdit) {
-      loadEditData();
-    }
-  }, [searchParams]);
 
   // Funciones auxiliares (sin cambios)
   const addProblem = () => {
