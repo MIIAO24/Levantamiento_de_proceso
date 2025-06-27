@@ -438,6 +438,41 @@ class ApiService {
       return false;
     }
   }
+
+  // ✅ MÉTODO PARA ACTUALIZAR SOLO EL ESTADO DE UN FORMULARIO
+  async updateFormStatus(formId: string, newStatus: 'Completado' | 'En Revisión' | 'Pendiente'): Promise<ApiResponse<any>> {
+    try {
+      console.log('🔄 Updating form status:', { formId, newStatus });
+      
+      // Primero obtener el formulario actual
+      const currentForm = await this.getProcessFormById(formId);
+      if (!currentForm) {
+        throw new Error('Formulario no encontrado');
+      }
+      
+      // Crear el objeto de actualización solo con el estado cambiado
+      const updateData = {
+        id: formId,
+        formData: currentForm, // Mantener todos los datos actuales
+        problems: currentForm.problems || [],
+        estado: newStatus, // Solo cambiar el estado
+        statusUpdatedAt: new Date().toISOString(),
+        statusUpdatedBy: 'manual-update' // Marcar como actualización manual
+      };
+      
+      const result = await this.request('/Form_proceso', {
+        method: 'PUT',
+        body: JSON.stringify(updateData),
+      });
+      
+      console.log('✅ Form status updated successfully');
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error updating form status:', error);
+      throw error;
+    }
+  }
 }
 
 // Instancia por defecto

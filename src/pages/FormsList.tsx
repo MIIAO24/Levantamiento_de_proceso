@@ -21,7 +21,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, RefreshCw, Eye, Trash2, FileText, Edit2 } from 'lucide-react'
+import { Search, RefreshCw, Eye, Trash2, FileText, Edit2, ChevronDown, Check } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator
+} from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { useToast } from "@/hooks/use-toast"
 import { apiService } from '@/services/apiService'
 
 interface ProcessForm {
@@ -83,12 +96,14 @@ interface ApiResponse {
 
 const FormsList: React.FC = () => {
   const navigate = useNavigate()
+  const { toast } = useToast()
   const [forms, setForms] = useState<ProcessForm[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedForm, setSelectedForm] = useState<ProcessForm | null>(null)
   const [editingForm, setEditingForm] = useState<ProcessForm | null>(null)
+  const [updatingStatus, setUpdatingStatus] = useState<string | null>(null)
   const [stats, setStats] = useState({
     total: 0,
     completados: 0,
@@ -171,6 +186,65 @@ const FormsList: React.FC = () => {
     navigate(`/formularios/editar/${form.id}`)
   }
 
+  const handleStatusChange = async (formId: string, newStatus: 'Completado' | 'En Revisión' | 'Pendiente') => {
+    const currentForm = forms.find(f => f.id === formId)
+    if (!currentForm) return
+    
+    // Si el estado es el mismo, no hacer nada
+    if (currentForm.estado === newStatus) return
+    
+    try {
+      setUpdatingStatus(formId)
+      console.log('🔄 Cambiando estado del formulario:', { formId, from: currentForm.estado, to: newStatus })
+      
+      const response = await apiService.updateFormStatus(formId, newStatus)
+      
+      if (response.success) {
+        // Actualizar el formulario en el estado local
+        setForms(prevForms => 
+          prevForms.map(form => 
+            form.id === formId 
+              ? { ...form, estado: newStatus }
+              : form
+          )
+        )
+        
+        // Recalcular estadísticas
+        const updatedForms = forms.map(form => 
+          form.id === formId 
+            ? { ...form, estado: newStatus }
+            : form
+        )
+        setStats({
+          total: updatedForms.length,
+          completados: updatedForms.filter(item => item.estado === 'Completado').length,
+          enRevision: updatedForms.filter(item => item.estado === 'En Revisión').length,
+          pendientes: updatedForms.filter(item => item.estado === 'Pendiente').length
+        })
+        
+        toast({
+          title: "Estado actualizado",
+          description: `El formulario "${currentForm.nombreProceso}" ha sido marcado como "${newStatus}".`,
+          duration: 3000,
+        })
+        
+        console.log('✅ Estado actualizado exitosamente')
+      } else {
+        throw new Error(response.message || 'Error al actualizar el estado')
+      }
+    } catch (err) {
+      console.error('❌ Error actualizando estado:', err)
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el estado del formulario. Inténtalo de nuevo.",
+        variant: "destructive",
+        duration: 5000,
+      })
+    } finally {
+      setUpdatingStatus(null)
+    }
+  }
+
   useEffect(() => {
     loadForms()
   }, [])
@@ -192,6 +266,66 @@ const FormsList: React.FC = () => {
       default:
         return 'bg-gray-100 text-gray-800 hover:bg-gray-200'
     }
+  }
+
+  const StatusDropdown: React.FC<{ form: ProcessForm }> = ({ form }) => {
+    const isUpdating = updatingStatus === form.id
+    const estados = ['Pendiente', 'En Revisión', 'Completado'] as const
+    
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className={`h-auto p-1 ${getEstadoBadgeColor(form.estado)} rounded-full`}
+                  disabled={isUpdating}
+                >
+                  <Badge className={`${getEstadoBadgeColor(form.estado)} border-none cursor-pointer`}>
+                    {isUpdating ? (
+                      <RefreshCw className="h-3 w-3 animate-spin mr-1" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 mr-1" />
+                    )}
+                    {form.estado}
+                  </Badge>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-44">
+                <div className="px-2 py-1.5 text-xs text-gray-500">
+                  Cambiar estado del formulario
+                </div>
+                <DropdownMenuSeparator />
+                {estados.map((estado) => (
+                  <DropdownMenuItem
+                    key={estado}
+                    onClick={() => handleStatusChange(form.id, estado)}
+                    className={`cursor-pointer ${form.estado === estado ? 'bg-gray-100' : ''}`}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <span className="flex items-center">
+                        <div className={`w-2 h-2 rounded-full mr-2 ${
+                          estado === 'Completado' ? 'bg-green-500' :
+                          estado === 'En Revisión' ? 'bg-yellow-500' : 'bg-red-500'
+                        }`} />
+                        {estado}
+                      </span>
+                      {form.estado === estado && <Check className="h-3 w-3" />}
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Click para cambiar el estado</p>
+        </TooltipContent>
+      </Tooltip>
+    )
   }
 
   if (loading) {
@@ -313,7 +447,12 @@ const FormsList: React.FC = () => {
                   <TableHead>Solicitante</TableHead>
                   <TableHead>Área</TableHead>
                   <TableHead>Fecha</TableHead>
-                  <TableHead>Estado</TableHead>
+                  <TableHead>
+                    <div className="flex items-center space-x-1">
+                      <span>Estado</span>
+                      <ChevronDown className="h-3 w-3 text-gray-400" />
+                    </div>
+                  </TableHead>
                   <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
@@ -343,9 +482,7 @@ const FormsList: React.FC = () => {
                          (form.timestamp ? new Date(form.timestamp).toLocaleDateString() : 'Sin fecha')}
                       </TableCell>
                       <TableCell>
-                        <Badge className={getEstadoBadgeColor(form.estado)}>
-                          {form.estado}
-                        </Badge>
+                        <StatusDropdown form={form} />
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end space-x-2">
