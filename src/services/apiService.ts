@@ -440,37 +440,81 @@ class ApiService {
   }
 
   // ✅ MÉTODO PARA ACTUALIZAR SOLO EL ESTADO DE UN FORMULARIO
-  async updateFormStatus(formId: string, newStatus: 'Completado' | 'En Revisión' | 'Pendiente'): Promise<ApiResponse<any>> {
+  async updateFormStatus(formId: string, newStatus: 'Completado' | 'En Revisión' | 'Pendiente'): Promise<ApiResponse<ProcessForm>> {
     try {
-      console.log('🔄 Updating form status:', { formId, newStatus });
+      console.log('🔄 Actualizando estado del formulario:', { formId, newStatus });
       
-      // Primero obtener el formulario actual
-      const currentForm = await this.getProcessFormById(formId);
-      if (!currentForm) {
+      // Primero, obtener el formulario actual
+      const currentFormResponse = await this.getFormById(formId);
+      if (!currentFormResponse.success || !currentFormResponse.data) {
         throw new Error('Formulario no encontrado');
       }
       
-      // Crear el objeto de actualización solo con el estado cambiado
+      const currentForm = currentFormResponse.data;
+      
+      // Crear los datos de actualización con el nuevo estado
       const updateData = {
         id: formId,
-        formData: currentForm, // Mantener todos los datos actuales
+        formData: {
+          // Mantener todos los datos existentes del formulario
+          ...currentForm,
+          // ⭐ CRÍTICO: Excluir campos del sistema para evitar duplicación
+          id: undefined,
+          timestamp: undefined,
+          createdAt: undefined,
+          updatedAt: undefined,
+          source: undefined,
+          version: undefined,
+          updateCount: undefined,
+          estado: undefined // No incluir en formData, se maneja por separado
+        },
         problems: currentForm.problems || [],
-        estado: newStatus, // Solo cambiar el estado
-        statusUpdatedAt: new Date().toISOString(),
-        statusUpdatedBy: 'manual-update' // Marcar como actualización manual
+        // ⭐ NUEVO: Agregar el estado específicamente
+        estado: newStatus
       };
       
-      const result = await this.request('/Form_proceso', {
-        method: 'PUT',
-        body: JSON.stringify(updateData),
+      console.log('📝 Datos de actualización preparados:', {
+        formId,
+        newStatus,
+        hasFormData: !!updateData.formData,
+        estadoEspecifico: updateData.estado
       });
       
-      console.log('✅ Form status updated successfully');
-      return result;
+      // ⭐ FIX: Agregar la ruta /Form_proceso al endpoint
+      const response = await fetch(`${API_BASE_URL}/Form_proceso`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('✅ Estado del formulario actualizado exitosamente:', formId);
+        return {
+          success: true,
+          data: { ...currentForm, estado: newStatus }, // ⭐ Retornar con el nuevo estado
+          message: 'Estado actualizado correctamente'
+        };
+      } else {
+        throw new Error(result.message || 'Error desconocido al actualizar el estado');
+      }
       
     } catch (error) {
-      console.error('❌ Error updating form status:', error);
-      throw error;
+      console.error('❌ Error actualizando estado del formulario:', error);
+      return {
+        success: false,
+        data: null,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+        error: error instanceof Error ? error.message : String(error)
+      };
     }
   }
 }

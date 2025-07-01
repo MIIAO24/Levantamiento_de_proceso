@@ -200,7 +200,7 @@ const FormsList: React.FC = () => {
       const response = await apiService.updateFormStatus(formId, newStatus)
       
       if (response.success) {
-        // Actualizar el formulario en el estado local
+        // ⭐ ACTUALIZACIÓN INMEDIATA Y OPTIMISTA
         setForms(prevForms => 
           prevForms.map(form => 
             form.id === formId 
@@ -209,34 +209,37 @@ const FormsList: React.FC = () => {
           )
         )
         
-        // Recalcular estadísticas
-        const updatedForms = forms.map(form => 
-          form.id === formId 
-            ? { ...form, estado: newStatus }
-            : form
-        )
-        setStats({
-          total: updatedForms.length,
-          completados: updatedForms.filter(item => item.estado === 'Completado').length,
-          enRevision: updatedForms.filter(item => item.estado === 'En Revisión').length,
-          pendientes: updatedForms.filter(item => item.estado === 'Pendiente').length
-        })
-        
+        console.log('✅ Estado actualizado exitosamente:', { formId, newStatus })
         toast({
           title: "Estado actualizado",
-          description: `El formulario "${currentForm.nombreProceso}" ha sido marcado como "${newStatus}".`,
+          description: `El formulario ahora está en estado: ${newStatus}`,
           duration: 3000,
         })
         
-        console.log('✅ Estado actualizado exitosamente')
+        // ⭐ COMENTADO TEMPORALMENTE - CAUSA REVERSIÓN DEL ESTADO
+        // setTimeout(async () => {
+        //   try {
+        //     await loadForms()
+        //     console.log('🔄 Datos refrescados desde el servidor')
+        //   } catch (error) {
+        //     console.error('⚠️ Error refrescando datos:', error)
+        //   }
+        // }, 1000)
+        
       } else {
-        throw new Error(response.message || 'Error al actualizar el estado')
+        console.error('❌ Error actualizando estado:', response.message)
+        toast({
+          title: "Error",
+          description: response.message || "No se pudo actualizar el estado",
+          variant: "destructive",
+          duration: 5000,
+        })
       }
     } catch (err) {
-      console.error('❌ Error actualizando estado:', err)
+      console.error('❌ Error inesperado:', err)
       toast({
         title: "Error",
-        description: "No se pudo actualizar el estado del formulario. Inténtalo de nuevo.",
+        description: "Error inesperado al actualizar el estado",
         variant: "destructive",
         duration: 5000,
       })
