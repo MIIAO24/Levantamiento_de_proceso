@@ -145,20 +145,35 @@ const FormsList: React.FC = () => {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este formulario?')) {
-      return
+      return;
     }
-
     try {
-      console.log('🗑️ Eliminando formulario:', id)
-      // Aquí implementarías la llamada para eliminar
-      // await apiService.deleteForm(id)
-      
-      // Por ahora, solo lo removemos del estado local
-      setForms(forms.filter(form => form.id !== id))
-      console.log('✅ Formulario eliminado del estado local')
+      console.log('🗑️ Eliminando formulario:', id);
+      const response = await apiService.deleteForm(id);
+      if (response.success) {
+        toast({
+          title: 'Formulario eliminado',
+          description: 'El formulario fue eliminado exitosamente.',
+          duration: 3000,
+        });
+        // Recargar la lista desde el backend para mantener el estado sincronizado
+        await loadForms();
+      } else {
+        toast({
+          title: 'Error',
+          description: response.message || 'No se pudo eliminar el formulario',
+          variant: 'destructive',
+          duration: 5000,
+        });
+      }
     } catch (err) {
-      console.error('❌ Error eliminando formulario:', err)
-      alert('Error al eliminar el formulario')
+      console.error('❌ Error eliminando formulario:', err);
+      toast({
+        title: 'Error',
+        description: 'Error al eliminar el formulario',
+        variant: 'destructive',
+        duration: 5000,
+      });
     }
   }
 

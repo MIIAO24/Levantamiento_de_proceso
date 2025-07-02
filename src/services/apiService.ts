@@ -312,7 +312,7 @@ class ApiService {
 
   // Eliminar forma (implementar en Lambda si es necesario)
   async deleteForm(id: string): Promise<ApiResponse<{ message: string }>> {
-    return this.request<{ message: string }>('', {
+    return this.request<{ message: string }>('/Form_proceso', {
       method: 'DELETE',
       body: JSON.stringify({ id }),
     });
