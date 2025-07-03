@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { Search, RefreshCw, Eye, Trash2, FileText, Edit2, ChevronDown, Check } from 'lucide-react'
+import { Search, RefreshCw, Eye, Trash2, FileText, Edit2, ChevronDown, Check, Printer } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,6 +98,366 @@ const FormsList: React.FC = () => {
   const navigate = useNavigate()
   const { toast } = useToast()
   const [forms, setForms] = useState<ProcessForm[]>([])
+
+  // Función para imprimir/exportar el formulario
+  const handlePrintForm = (form: ProcessForm) => {
+    // Crear una nueva ventana para la impresión
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast({
+        title: "Error",
+        description: "No se pudo abrir la ventana de impresión. Verifica que no esté bloqueada por el navegador.",
+        variant: "destructive",
+        duration: 5000,
+      })
+      return
+    }
+
+    // Generar el HTML para imprimir
+    const printContent = generatePrintableHTML(form)
+    
+    printWindow.document.write(printContent)
+    printWindow.document.close()
+    
+    // Esperar a que se cargue y luego imprimir
+    printWindow.onload = () => {
+      printWindow.print()
+      printWindow.close()
+    }
+
+    toast({
+      title: "Impresión preparada",
+      description: "El formulario se ha preparado para impresión.",
+      duration: 3000,
+    })
+  }
+
+  // Función para generar HTML imprimible
+  const generatePrintableHTML = (form: ProcessForm): string => {
+    const currentDate = new Date().toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+
+    return `
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulario de Levantamiento - ${form.nombreProceso}</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 210mm;
+            margin: 0 auto;
+            padding: 20mm;
+            background: white;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #2563eb;
+            font-size: 28px;
+            margin: 0 0 10px 0;
+        }
+        .header .subtitle {
+            color: #64748b;
+            font-size: 16px;
+            margin: 0;
+        }
+        .section {
+            margin-bottom: 30px;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            background: #f1f5f9;
+            color: #1e293b;
+            padding: 12px 16px;
+            border-left: 4px solid #2563eb;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .field-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 15px;
+        }
+        .field {
+            margin-bottom: 15px;
+        }
+        .field-label {
+            font-weight: bold;
+            color: #374151;
+            margin-bottom: 5px;
+            display: block;
+        }
+        .field-value {
+            background: #f9fafb;
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            min-height: 20px;
+        }
+        .field-value.large {
+            min-height: 60px;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-completado { background: #dcfce7; color: #166534; }
+        .status-revision { background: #fef3c7; color: #92400e; }
+        .status-pendiente { background: #fee2e2; color: #991b1b; }
+        .tag {
+            display: inline-block;
+            background: #dbeafe;
+            color: #1d4ed8;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            margin: 2px;
+        }
+        .problem-box {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            text-align: center;
+            color: #6b7280;
+            font-size: 12px;
+        }
+        .metadata {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        @media print {
+            body { margin: 0; padding: 15mm; }
+            .section { page-break-inside: avoid; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Formulario de Levantamiento de Proceso</h1>
+        <p class="subtitle">${form.nombreProceso}</p>
+        <p class="subtitle">Generado el: ${currentDate}</p>
+    </div>
+
+    <!-- Información General -->
+    <div class="section">
+        <div class="section-title">📋 Información General</div>
+        <div class="field-group">
+            <div class="field">
+                <span class="field-label">Solicitante:</span>
+                <div class="field-value">${form.nombreSolicitante || 'No especificado'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Área/Departamento:</span>
+                <div class="field-value">${form.areaDepartamento || 'No especificado'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Fecha de Solicitud:</span>
+                <div class="field-value">${form.fechaSolicitud || 'No especificada'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Estado:</span>
+                <div class="field-value">
+                    <span class="status-badge ${
+                      form.estado === 'Completado' ? 'status-completado' :
+                      form.estado === 'En Revisión' ? 'status-revision' :
+                      'status-pendiente'
+                    }">${form.estado}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Descripción del Proceso -->
+    <div class="section">
+        <div class="section-title">📝 Descripción del Proceso</div>
+        <div class="field">
+            <span class="field-label">Descripción General:</span>
+            <div class="field-value large">${form.descripcionGeneral || 'No especificada'}</div>
+        </div>
+        <div class="field">
+            <span class="field-label">Objetivo del Proceso:</span>
+            <div class="field-value large">${form.objetivoProceso || 'No especificado'}</div>
+        </div>
+        <div class="field">
+            <span class="field-label">Pasos Principales:</span>
+            <div class="field-value large">${form.pasosPrincipales || 'No especificados'}</div>
+        </div>
+        <div class="field">
+            <span class="field-label">Herramientas/Sistemas:</span>
+            <div class="field-value">
+                ${form.herramientas && form.herramientas.length > 0 
+                  ? form.herramientas.map(h => `<span class="tag">${h}</span>`).join(' ')
+                  : 'No especificadas'
+                }
+                ${form.otrasHerramientas ? `<br><strong>Otras:</strong> ${form.otrasHerramientas}` : ''}
+            </div>
+        </div>
+    </div>
+
+    <!-- Participantes y Responsables -->
+    <div class="section">
+        <div class="section-title">👥 Participantes y Responsables</div>
+        <div class="field">
+            <span class="field-label">Responsable del Proceso:</span>
+            <div class="field-value">${form.responsableProceso || 'No especificado'}</div>
+        </div>
+        <div class="field">
+            <span class="field-label">Participantes Principales:</span>
+            <div class="field-value">${form.participantesPrincipales || 'No especificados'}</div>
+        </div>
+        <div class="field">
+            <span class="field-label">Clientes/Beneficiarios:</span>
+            <div class="field-value">${form.clientesBeneficiarios || 'No especificados'}</div>
+        </div>
+    </div>
+
+    <!-- Reglas de Negocio -->
+    <div class="section">
+        <div class="section-title">⚖️ Reglas de Negocio</div>
+        <div class="field">
+            <span class="field-label">Reglas de Negocio Principales:</span>
+            <div class="field-value large">${form.reglasNegocio || 'No especificadas'}</div>
+        </div>
+        <div class="field-group">
+            <div class="field">
+                <span class="field-label">Casos Excepcionales:</span>
+                <div class="field-value">${form.casosExcepcionales || 'No especificados'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Procedimientos de Escalamiento:</span>
+                <div class="field-value">${form.procedimientosEscalamiento || 'No especificados'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Normativas Regulatorias:</span>
+                <div class="field-value">${form.normativasRegulatorias || 'No especificadas'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Políticas Internas:</span>
+                <div class="field-value">${form.politicasInternas || 'No especificadas'}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Especificaciones de la Solución -->
+    <div class="section">
+        <div class="section-title">🔧 Especificaciones de la Solución</div>
+        <div class="field">
+            <span class="field-label">Funcionalidades Requeridas:</span>
+            <div class="field-value large">${form.funcionalidadesRequeridas || 'No especificadas'}</div>
+        </div>
+        <div class="field-group">
+            <div class="field">
+                <span class="field-label">Tipo de Interfaz:</span>
+                <div class="field-value">${form.tipoInterfaz || 'No especificado'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Integraciones Requeridas:</span>
+                <div class="field-value">${form.integracionesRequeridas || 'No especificadas'}</div>
+            </div>
+        </div>
+        <div class="field">
+            <span class="field-label">Motivo del Levantamiento:</span>
+            <div class="field-value">
+                ${form.motivoLevantamiento && form.motivoLevantamiento.length > 0 
+                  ? form.motivoLevantamiento.map(m => `<span class="tag">${m}</span>`).join(' ')
+                  : 'No especificados'
+                }
+                ${form.otroMotivoTexto ? `<br><strong>Otro motivo:</strong> ${form.otroMotivoTexto}` : ''}
+            </div>
+        </div>
+        <div class="field">
+            <span class="field-label">Resultados Esperados:</span>
+            <div class="field-value large">${form.resultadosEsperados || 'No especificados'}</div>
+        </div>
+    </div>
+
+    <!-- Problemas y Oportunidades -->
+    ${form.problems && form.problems.length > 0 ? `
+    <div class="section">
+        <div class="section-title">⚠️ Problemas y Oportunidades</div>
+        ${form.problems.map((problem: any, index: number) => `
+            <div class="problem-box">
+                <div class="field">
+                    <span class="field-label">Problema ${index + 1}:</span>
+                    <div class="field-value">${problem.problema || 'No especificado'}</div>
+                </div>
+                <div class="field">
+                    <span class="field-label">Impacto:</span>
+                    <div class="field-value">${problem.impacto || 'No especificado'}</div>
+                </div>
+            </div>
+        `).join('')}
+    </div>
+    ` : ''}
+
+    <!-- Información Técnica -->
+    <div class="section">
+        <div class="section-title">🖥️ Información Técnica y de Sistemas</div>
+        <div class="field-group">
+            <div class="field">
+                <span class="field-label">Sistemas de Apoyo:</span>
+                <div class="field-value">${form.sistemasApoyo || 'No especificados'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Bases de Datos:</span>
+                <div class="field-value">${form.baseDatosInvolucrados || 'No especificados'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Integraciones Existentes:</span>
+                <div class="field-value">${form.integracionesExistentes || 'No especificadas'}</div>
+            </div>
+            <div class="field">
+                <span class="field-label">Origen de Información:</span>
+                <div class="field-value">${form.origenInformacion || 'No especificado'}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadatos del Sistema -->
+    <div class="metadata">
+        <strong>Información del Sistema:</strong><br>
+        ID: ${form.id}<br>
+        Creado: ${new Date(form.timestamp).toLocaleString()}<br>
+        Generado para impresión: ${currentDate}
+    </div>
+
+    <div class="footer">
+        <p>Sistema de Levantamiento de Procesos - Documento generado automáticamente</p>
+        <p>© ${new Date().getFullYear()} - Confidencial</p>
+    </div>
+</body>
+</html>
+    `
+  }
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -810,6 +1170,14 @@ const FormsList: React.FC = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedForm(null)}>
               Cerrar
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => handlePrintForm(selectedForm!)}
+              className="border-green-600 text-green-600 hover:bg-green-50"
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              Imprimir
             </Button>
             <Button 
               onClick={() => handleEdit(selectedForm!)}
